@@ -53,7 +53,7 @@ MULTI-LINK QR/
 ├── assets/
 │   ├── logo.svg            # Official Maple Connect QR brand mark
 │   └── vendor/
-│       └── qrcodejs.min.js # Standalone, offline-ready QR code engine
+│       └── qrcode.min.js   # High-resolution vector QR code engine (ISO/IEC compliant)
 ├── README.md               # Complete documentation and architecture guide
 └── package.json            # Minimal development scripts and lightweight server
 ```

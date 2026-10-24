@@ -132,7 +132,8 @@
   // UTF-8 Resilient Payload Decoder
   function decodeProfileData(raw) {
     try {
-      let clean = decodeURIComponent(raw);
+      let clean = decodeURIComponent(raw).replace(/-/g, "+").replace(/_/g, "/");
+      while (clean.length % 4) clean += "=";
       let json = "";
       try {
         const binary = atob(clean);

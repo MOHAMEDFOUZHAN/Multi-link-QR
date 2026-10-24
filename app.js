@@ -237,7 +237,7 @@
     });
 
     DOM.tabModeLocal.addEventListener("click", () => {
-      setQRMode("local");
+      setQRMode("portable");
     });
 
     DOM.tabModeOffline.addEventListener("click", () => {
@@ -264,15 +264,17 @@
   function setQRMode(mode) {
     currentModel.qrMode = mode;
     DOM.tabModeWifi.classList.toggle("active", mode === "wifi");
-    DOM.tabModeLocal.classList.toggle("active", mode === "local");
+    DOM.tabModeLocal.classList.toggle("active", mode === "portable" || mode === "local");
     DOM.tabModeOffline.classList.toggle("active", mode === "offline");
 
-    if (mode === "wifi") {
+    if (mode === "wifi" || mode === "portable" || mode === "local") {
       DOM.hostConfigRow.classList.remove("hidden");
       DOM.inputHostAddress.value = currentModel.networkHost || getDefaultHost();
-      DOM.hostHintText.textContent = "📱 Scannable with any mobile phone camera.";
-    } else if (mode === "local") {
-      DOM.hostConfigRow.classList.add("hidden");
+      if (mode === "wifi") {
+        DOM.hostHintText.textContent = "⚡ Clean short link: instant 0.1s scan on any phone camera.";
+      } else {
+        DOM.hostHintText.textContent = "📦 Standalone profile: all links & styling embedded into QR code.";
+      }
     } else if (mode === "offline") {
       DOM.hostConfigRow.classList.add("hidden");
     }
@@ -593,24 +595,25 @@
   // Compact payload encoder
   function encodeProfileData(model) {
     try {
-      const compact = {
-        n: model.name || "My Links",
-        s: model.slug || "profile",
-        b: model.bio || "",
-        a: model.avatarUrl && model.avatarUrl.startsWith("http") ? model.avatarUrl : "",
-        p: model.contactPhone,
-        e: model.contactEmail,
-        t: model.theme,
-        sh: model.buttonShape,
-        l: (model.links || []).map((l) => ({
-          t: l.linkType,
-          ti: l.title,
-          d: l.destination,
-          ds: l.description || "",
-        })),
-      };
+      const compact = {};
+      if (model.name) compact.n = model.name;
+      if (model.slug) compact.s = model.slug;
+      if (model.bio) compact.b = model.bio;
+      if (model.avatarUrl && model.avatarUrl.startsWith("http")) compact.a = model.avatarUrl;
+      if (model.contactPhone) compact.p = model.contactPhone;
+      if (model.contactEmail) compact.e = model.contactEmail;
+      if (model.theme && model.theme !== "minimal") compact.t = model.theme;
+      if (model.buttonShape && model.buttonShape !== "rounded") compact.sh = model.buttonShape;
+      if (model.links && model.links.length > 0) {
+        compact.l = model.links.filter((l) => l.isEnabled !== false).map((l) => {
+          const item = { t: l.linkType || "custom", ti: l.title, d: l.destination };
+          if (l.description) item.ds = l.description;
+          return item;
+        });
+      }
       const json = JSON.stringify(compact);
-      return encodeURIComponent(btoa(unescape(encodeURIComponent(json))));
+      const binary = unescape(encodeURIComponent(json));
+      return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
     } catch (e) {
       return "";
     }
@@ -649,7 +652,7 @@
 
     if (currentModel.qrMode === "offline") {
       qrData = buildVCardPayload(currentModel);
-      DOM.qrTargetUrlText.textContent = `Offline Contact Card (${currentModel.name})`;
+      DOM.qrTargetUrlText.textContent = `Offline Contact Card (${currentModel.name || "My Contact"})`;
     } else {
       const fullUrl = buildFullProfileUrl(currentModel.slug);
       qrData = fullUrl;
@@ -662,36 +665,53 @@
     DOM.navPreviewLiveBtn.href = directUrl;
 
     DOM.heroQrTarget.innerHTML = "";
+    const canvas = document.createElement("canvas");
+    DOM.heroQrTarget.appendChild(canvas);
 
-    if (typeof QRCode !== "undefined") {
-      new QRCode(DOM.heroQrTarget, {
-        text: qrData,
-        width: 190,
-        height: 190,
-        colorDark: currentModel.qrDark || "#0F172A",
-        colorLight: currentModel.qrLight || "#FFFFFF",
-        correctLevel: QRCode.CorrectLevel.M,
+    const qrlib = window.QRCodeLib || window.QRCode;
+    if (qrlib && typeof qrlib.toCanvas === "function") {
+      const isDense = qrData.length > 200;
+      qrlib.toCanvas(canvas, qrData, {
+        width: 220,
+        margin: isDense ? 5 : 4,
+        color: {
+          dark: currentModel.qrDark || "#000000",
+          light: currentModel.qrLight || "#FFFFFF",
+        },
+        errorCorrectionLevel: isDense ? "L" : "M",
+      }, (err) => {
+        if (err) console.error("Live QR render error:", err);
       });
     }
   }
 
-  // Build QR URL with phone scan host + portable embedded data
+  // Build QR URL with phone scan host
   function buildFullProfileUrl(slug) {
     let base = getDefaultHost();
-    if (currentModel.qrMode === "wifi" && currentModel.networkHost && currentModel.networkHost.trim() !== "") {
+    if (currentModel.networkHost && currentModel.networkHost.trim() !== "") {
       base = currentModel.networkHost.trim().replace(/\/$/, "");
     }
 
     const cleanSlug = slugify(slug || currentModel.slug || "profile");
-    const payload = encodeProfileData(currentModel);
-    return `${base}/profile.html?u=${encodeURIComponent(cleanSlug)}#d=${payload}`;
+
+    // In portable mode, embed the compact data payload for standalone scans
+    if (currentModel.qrMode === "portable" || currentModel.qrMode === "local") {
+      const payload = encodeProfileData(currentModel);
+      return `${base}/profile.html?u=${encodeURIComponent(cleanSlug)}#d=${payload}`;
+    }
+
+    // Fast-scan clean link (scans in 0.1s!)
+    return `${base}/profile.html?u=${encodeURIComponent(cleanSlug)}`;
   }
 
   function buildDirectLocalUrl(slug) {
     const origin = getDefaultHost();
     const cleanSlug = slugify(slug || currentModel.slug || "profile");
-    const payload = encodeProfileData(currentModel);
-    return `${origin}/profile.html?u=${encodeURIComponent(cleanSlug)}#d=${payload}`;
+    if (currentModel.qrMode === "portable" || currentModel.qrMode === "local") {
+      const payload = encodeProfileData(currentModel);
+      return `${origin}/profile.html?u=${encodeURIComponent(cleanSlug)}#d=${payload}`;
+    }
+    return `${origin}/profile.html?u=${encodeURIComponent(cleanSlug)}`;
   }
 
   // Render Smartphone Mockup in Real-Time
@@ -989,65 +1009,74 @@
     });
 
     DOM.btnDownloadPNG.addEventListener("click", () => {
-      const canvas = DOM.heroQrTarget.querySelector("canvas");
-      if (!canvas) return;
+      let qrData = "";
+      if (currentModel.qrMode === "offline") {
+        qrData = buildVCardPayload(currentModel);
+      } else {
+        qrData = buildFullProfileUrl(currentModel.slug);
+      }
 
-      const exportCanvas = document.createElement("canvas");
-      exportCanvas.width = 1024;
-      exportCanvas.height = 1024;
-      const ctx = exportCanvas.getContext("2d");
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(canvas, 0, 0, 1024, 1024);
-
-      const a = document.createElement("a");
-      a.href = exportCanvas.toDataURL("image/png");
-      a.download = `maple-qr-${currentModel.slug}.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      showToast("Downloaded high-res PNG!");
+      const isDense = qrData.length > 200;
+      const qrlib = window.QRCodeLib || window.QRCode;
+      if (qrlib && typeof qrlib.toDataURL === "function") {
+        qrlib.toDataURL(qrData, {
+          width: 1024,
+          margin: isDense ? 5 : 4,
+          color: {
+            dark: currentModel.qrDark || "#000000",
+            light: currentModel.qrLight || "#FFFFFF",
+          },
+          errorCorrectionLevel: isDense ? "L" : "M",
+        }).then((dataUrl) => {
+          const a = document.createElement("a");
+          a.href = dataUrl;
+          a.download = `maple-qr-${slugify(currentModel.slug || "profile")}.png`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          showToast("Downloaded high-res scannable PNG (1024px)!");
+        }).catch((err) => {
+          console.error("PNG export error:", err);
+          showToast("Failed to generate PNG");
+        });
+      }
     });
 
     DOM.btnDownloadSVG.addEventListener("click", () => {
-      const canvas = DOM.heroQrTarget.querySelector("canvas");
-      if (!canvas) return;
-
-      const ctx = canvas.getContext("2d");
-      const width = canvas.width;
-      const height = canvas.height;
-      const imgData = ctx.getImageData(0, 0, width, height).data;
-
-      let rects = [];
-      for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-          const i = (y * width + x) * 4;
-          const r = imgData[i];
-          const g = imgData[i + 1];
-          const b = imgData[i + 2];
-          const a = imgData[i + 3];
-
-          if (a > 128 && (r + g + b) < 380) {
-            rects.push(`<rect x="${x}" y="${y}" width="1" height="1" fill="${currentModel.qrDark}"/>`);
-          }
-        }
+      let qrData = "";
+      if (currentModel.qrMode === "offline") {
+        qrData = buildVCardPayload(currentModel);
+      } else {
+        qrData = buildFullProfileUrl(currentModel.slug);
       }
 
-      const svgString = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
-  <rect width="${width}" height="${height}" fill="${currentModel.qrLight}"/>
-  ${rects.join("\n  ")}
-</svg>`;
-
-      const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `maple-qr-${currentModel.slug}.svg`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      showToast("Downloaded scalable SVG!");
+      const isDense = qrData.length > 200;
+      const qrlib = window.QRCodeLib || window.QRCode;
+      if (qrlib && typeof qrlib.toString === "function") {
+        qrlib.toString(qrData, {
+          type: "svg",
+          margin: isDense ? 5 : 4,
+          color: {
+            dark: currentModel.qrDark || "#000000",
+            light: currentModel.qrLight || "#FFFFFF",
+          },
+          errorCorrectionLevel: isDense ? "L" : "M",
+        }).then((svgString) => {
+          const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `maple-qr-${slugify(currentModel.slug || "profile")}.svg`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          showToast("Downloaded scalable vector SVG!");
+        }).catch((err) => {
+          console.error("SVG export error:", err);
+          showToast("Failed to generate SVG");
+        });
+      }
     });
   }
 
