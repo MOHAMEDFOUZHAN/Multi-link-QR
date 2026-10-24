@@ -1,0 +1,22 @@
+{
+  "name": "maple-connect-qr",
+  "version": "1.0.0",
+  "description": "Maple Connect QR — One QR. Everything Connected. Modern Multi-Link QR Platform built with HTML5, CSS3, and Vanilla JavaScript.",
+  "private": true,
+  "scripts": {
+    "dev": "serve -p 3000 .",
+    "start": "serve -p 3000 ."
+  },
+  "dependencies": {
+    "serve": "^14.2.4",
+    "qrcode": "^1.5.4"
+  },
+  "keywords": [
+    "qr-code",
+    "multi-link",
+    "bio-link",
+    "vanilla-js"
+  ],
+  "author": "Maple Connect",
+  "license": "MIT"
+}

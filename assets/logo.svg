@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 64" fill="none">
+  <!-- Gradient Definitions -->
+  <defs>
+    <linearGradient id="mapleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3B82F6" />
+      <stop offset="50%" stop-color="#2563EB" />
+      <stop offset="100%" stop-color="#1D4ED8" />
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#60A5FA" />
+      <stop offset="100%" stop-color="#38BDF8" />
+    </linearGradient>
+    <linearGradient id="qrGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B" />
+      <stop offset="100%" stop-color="#0F172A" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#2563EB" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Logo Mark Container (QR + Interconnected Maple Geometry) -->
+  <g transform="translate(4, 4)" filter="url(#glow)">
+    <!-- Base Rounded Square -->
+    <rect x="0" y="0" width="56" height="56" rx="14" fill="url(#mapleGrad)" />
+    
+    <!-- Stylized Modern QR Corner Position Markers & Connected Nodes -->
+    <!-- Top Left Marker -->
+    <rect x="9" y="9" width="16" height="16" rx="4" fill="#FFFFFF" fill-opacity="0.95" />
+    <rect x="13" y="13" width="8" height="8" rx="2" fill="url(#mapleGrad)" />
+    
+    <!-- Top Right Marker -->
+    <rect x="31" y="9" width="16" height="16" rx="4" fill="#FFFFFF" fill-opacity="0.95" />
+    <rect x="35" y="13" width="8" height="8" rx="2" fill="url(#mapleGrad)" />
+    
+    <!-- Bottom Left Marker -->
+    <rect x="9" y="31" width="16" height="16" rx="4" fill="#FFFFFF" fill-opacity="0.95" />
+    <rect x="13" y="35" width="8" height="8" rx="2" fill="url(#mapleGrad)" />
+
+    <!-- Center Maple & Connection Hub Matrix -->
+    <!-- Dynamic digital connection nodes -->
+    <circle cx="35" cy="35" r="3.5" fill="#FFFFFF" />
+    <circle cx="43" cy="35" r="2.5" fill="url(#accentGrad)" />
+    <circle cx="35" cy="43" r="2.5" fill="url(#accentGrad)" />
+    <circle cx="43" cy="43" r="3.5" fill="#FFFFFF" />
+
+    <!-- Interconnecting pulse lines -->
+    <path d="M 25 17 L 31 17 M 17 25 L 17 31 M 35 25 L 35 31.5 M 25 35 L 31.5 35" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-dasharray="2 2" stroke-opacity="0.7"/>
+
+    <!-- Small Maple Leaf Emblem Overlay in center -->
+    <path d="M 28 22 C 28.5 24 27.5 25.5 25.5 26 C 27 27 28 27.5 28 29 C 28 27.5 29 27 30.5 26 C 28.5 25.5 27.5 24 28 22 Z" fill="#FFFFFF" />
+  </g>
+
+  <!-- Typography: Maple Connect QR -->
+  <g transform="translate(74, 14)">
+    <!-- Maple text -->
+    <text x="0" y="22" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="20" font-weight="800" fill="#0F172A" letter-spacing="-0.5">Maple<tspan fill="#2563EB">Connect</tspan></text>
+    
+    <!-- QR Badge -->
+    <rect x="136" y="6" width="30" height="18" rx="4" fill="#EFF6FF" stroke="#BFDBFE" stroke-width="1"/>
+    <text x="141" y="19" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="10" font-weight="800" fill="#1D4ED8" letter-spacing="0.5">QR</text>
+
+    <!-- Tagline -->
+    <text x="0" y="38" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="500" fill="#64748B" letter-spacing="0.2">One QR. Everything Connected.</text>
+  </g>
+</svg>
