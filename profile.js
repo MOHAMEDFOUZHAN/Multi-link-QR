@@ -52,6 +52,25 @@
     custom: "Open",
   };
 
+  // Standard Default Titles Database
+  const DEFAULT_TITLES = {
+    whatsapp: "Chat on WhatsApp",
+    instagram: "Follow on Instagram",
+    facebook: "Connect on Facebook",
+    youtube: "Subscribe on YouTube",
+    linkedin: "Connect on LinkedIn",
+    tiktok: "Watch on TikTok",
+    x: "Follow on X",
+    website: "Visit Website",
+    google_maps: "Google Maps Location",
+    phone: "Call Telephone Hotline",
+    email: "Send Email Inquiry",
+    telegram: "Telegram Channel",
+    store: "Shop Online Store",
+    menu: "Browse Food & Drinks Menu",
+    custom: "Custom Link",
+  };
+
   // Theme Meta Colors for Mobile Browser Status Bars
   const THEME_META_COLORS = {
     minimal: "#F8FAFC",
@@ -165,15 +184,18 @@
           buttonStyle: c.sh || "rounded",
         },
         links: Array.isArray(c.l)
-          ? c.l.map((item, idx) => ({
-              id: "lnk_" + idx,
-              linkType: item.t || "custom",
-              title: item.ti || "Link",
-              destination: item.d || "",
-              description: item.ds || "",
-              isEnabled: true,
-              sortOrder: idx,
-            }))
+          ? c.l.map((item, idx) => {
+              const type = item.t || "custom";
+              return {
+                id: "lnk_" + idx,
+                linkType: type,
+                title: item.ti || DEFAULT_TITLES[type] || "Link",
+                destination: item.d || "",
+                description: item.ds || "",
+                isEnabled: true,
+                sortOrder: idx,
+              };
+            })
           : [],
       };
     } catch (e) {
@@ -200,6 +222,22 @@
     // 1. Try decoding embedded QR payload first
     if (encodedPayload) {
       profile = decodeProfileData(encodedPayload);
+      if (profile) {
+        // Cache this profile on the viewer's device so subsequent visits by slug also work
+        try {
+          const cachedProfiles = Storage.getProfiles();
+          const pSlug = (profile.slug || slug || "").toLowerCase();
+          const existingIdx = cachedProfiles.findIndex((p) => (p.slug || "").toLowerCase() === pSlug);
+          if (existingIdx !== -1) {
+            cachedProfiles[existingIdx] = profile;
+          } else {
+            cachedProfiles.unshift(profile);
+          }
+          Storage.saveProfiles(cachedProfiles);
+        } catch (e) {
+          console.warn("Failed to cache profile in Storage", e);
+        }
+      }
     }
 
     const profiles = Storage.getProfiles();

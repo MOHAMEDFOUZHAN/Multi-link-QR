@@ -263,20 +263,16 @@
 
   function setQRMode(mode) {
     currentModel.qrMode = mode;
-    DOM.tabModeWifi.classList.toggle("active", mode === "wifi");
+    DOM.tabModeWifi.classList.toggle("active", mode === "wifi" || mode === "web");
     DOM.tabModeLocal.classList.toggle("active", mode === "portable" || mode === "local");
     DOM.tabModeOffline.classList.toggle("active", mode === "offline");
 
-    if (mode === "wifi" || mode === "portable" || mode === "local") {
+    if (mode === "offline") {
+      DOM.hostConfigRow.classList.add("hidden");
+    } else {
       DOM.hostConfigRow.classList.remove("hidden");
       DOM.inputHostAddress.value = currentModel.networkHost || getDefaultHost();
-      if (mode === "wifi") {
-        DOM.hostHintText.textContent = "⚡ Clean short link: instant 0.1s scan on any phone camera.";
-      } else {
-        DOM.hostHintText.textContent = "📦 Standalone profile: all links & styling embedded into QR code.";
-      }
-    } else if (mode === "offline") {
-      DOM.hostConfigRow.classList.add("hidden");
+      DOM.hostHintText.textContent = "🌐 Scans and loads your complete multi-link profile on any mobile phone.";
     }
 
     renderLiveQR();
@@ -606,7 +602,12 @@
       if (model.buttonShape && model.buttonShape !== "rounded") compact.sh = model.buttonShape;
       if (model.links && model.links.length > 0) {
         compact.l = model.links.filter((l) => l.isEnabled !== false).map((l) => {
-          const item = { t: l.linkType || "custom", ti: l.title, d: l.destination };
+          const type = l.linkType || "custom";
+          const item = { t: type, d: l.destination || "" };
+          const defTitle = getDefaultTitle(type);
+          if (l.title && l.title !== defTitle) {
+            item.ti = l.title;
+          }
           if (l.description) item.ds = l.description;
           return item;
         });
@@ -685,7 +686,7 @@
     }
   }
 
-  // Build QR URL with phone scan host
+  // Build QR URL with phone scan host (embeds payload for serverless static deployment)
   function buildFullProfileUrl(slug) {
     let base = getDefaultHost();
     if (currentModel.networkHost && currentModel.networkHost.trim() !== "") {
@@ -693,25 +694,15 @@
     }
 
     const cleanSlug = slugify(slug || currentModel.slug || "profile");
-
-    // In portable mode, embed the compact data payload for standalone scans
-    if (currentModel.qrMode === "portable" || currentModel.qrMode === "local") {
-      const payload = encodeProfileData(currentModel);
-      return `${base}/profile.html?u=${encodeURIComponent(cleanSlug)}#d=${payload}`;
-    }
-
-    // Fast-scan clean link (scans in 0.1s!)
-    return `${base}/profile.html?u=${encodeURIComponent(cleanSlug)}`;
+    const payload = encodeProfileData(currentModel);
+    return `${base}/profile.html?u=${encodeURIComponent(cleanSlug)}#d=${payload}`;
   }
 
   function buildDirectLocalUrl(slug) {
     const origin = getDefaultHost();
     const cleanSlug = slugify(slug || currentModel.slug || "profile");
-    if (currentModel.qrMode === "portable" || currentModel.qrMode === "local") {
-      const payload = encodeProfileData(currentModel);
-      return `${origin}/profile.html?u=${encodeURIComponent(cleanSlug)}#d=${payload}`;
-    }
-    return `${origin}/profile.html?u=${encodeURIComponent(cleanSlug)}`;
+    const payload = encodeProfileData(currentModel);
+    return `${origin}/profile.html?u=${encodeURIComponent(cleanSlug)}#d=${payload}`;
   }
 
   // Render Smartphone Mockup in Real-Time
