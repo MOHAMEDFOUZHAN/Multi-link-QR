@@ -205,7 +205,7 @@
   }
 
   // Initialize Page
-  function init() {
+  async function init() {
     const params = new URLSearchParams(window.location.search);
     const slug = params.get("u") || params.get("slug");
     const id = params.get("id");
@@ -219,8 +219,34 @@
 
     let profile = null;
 
-    // 1. Try decoding embedded QR payload first
-    if (encodedPayload) {
+    // 1. Try Cloud Database first (Dynamic QR Live Mode)
+    if (slug && window.CloudSync && window.CloudSync.isConfigured()) {
+      try {
+        const cloudProfile = await window.CloudSync.getProfile(slug);
+        if (cloudProfile) {
+          profile = cloudProfile;
+          // Cache to local storage for instant offline loading on next scan
+          try {
+            const cachedProfiles = Storage.getProfiles();
+            const pSlug = (profile.slug || slug || "").toLowerCase();
+            const existingIdx = cachedProfiles.findIndex((p) => (p.slug || "").toLowerCase() === pSlug);
+            if (existingIdx !== -1) {
+              cachedProfiles[existingIdx] = profile;
+            } else {
+              cachedProfiles.unshift(profile);
+            }
+            Storage.saveProfiles(cachedProfiles);
+          } catch (e) {
+            console.warn("Failed to cache cloud profile in Storage", e);
+          }
+        }
+      } catch (cloudErr) {
+        console.warn("CloudSync query failed, checking fallbacks:", cloudErr);
+      }
+    }
+
+    // 2. Try decoding embedded QR payload (#d=...) if not loaded from cloud
+    if (!profile && encodedPayload) {
       profile = decodeProfileData(encodedPayload);
       if (profile) {
         // Cache this profile on the viewer's device so subsequent visits by slug also work
@@ -242,7 +268,7 @@
 
     const profiles = Storage.getProfiles();
 
-    // 2. Search saved profiles if not found via embedded payload
+    // 3. Search saved profiles if not found via cloud or embedded payload
     if (!profile && (slug || id)) {
       profile = profiles.find((p) => {
         if (id && p.id === id) return true;

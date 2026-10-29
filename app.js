@@ -129,6 +129,32 @@
     btnResetForm: document.getElementById("btnResetForm"),
     btnLoadExample: document.getElementById("btnLoadExample"),
     navPreviewLiveBtn: document.getElementById("navPreviewLiveBtn"),
+    btnOpenCloudSyncModal: document.getElementById("btnOpenCloudSyncModal"),
+    navCloudStatusDot: document.getElementById("navCloudStatusDot"),
+    navCloudStatusText: document.getElementById("navCloudStatusText"),
+
+    // Dynamic Cloud Sync & Wall QR
+    cloudSyncModal: document.getElementById("cloudSyncModal"),
+    btnCloseCloudModal: document.getElementById("btnCloseCloudModal"),
+    cloudStatusCard: document.getElementById("cloudStatusCard"),
+    cloudStatusIndicator: document.getElementById("cloudStatusIndicator"),
+    cloudStatusHeader: document.getElementById("cloudStatusHeader"),
+    cloudStatusMessage: document.getElementById("cloudStatusMessage"),
+    inputSupabaseUrl: document.getElementById("inputSupabaseUrl"),
+    inputSupabaseKey: document.getElementById("inputSupabaseKey"),
+    inputTableName: document.getElementById("inputTableName"),
+    checkAutoSync: document.getElementById("checkAutoSync"),
+    sqlSnippetCode: document.getElementById("sqlSnippetCode"),
+    btnCopySql: document.getElementById("btnCopySql"),
+    btnDisconnectCloud: document.getElementById("btnDisconnectCloud"),
+    btnTestCloudConnection: document.getElementById("btnTestCloudConnection"),
+    btnSaveCloudConfig: document.getElementById("btnSaveCloudConfig"),
+    dynamicSyncCard: document.getElementById("dynamicSyncCard"),
+    dynamicSyncTitle: document.getElementById("dynamicSyncTitle"),
+    dynamicSyncDesc: document.getElementById("dynamicSyncDesc"),
+    btnSyncCloudNow: document.getElementById("btnSyncCloudNow"),
+    syncSpinIcon: document.getElementById("syncSpinIcon"),
+    btnSyncCloudNowLabel: document.getElementById("btnSyncCloudNowLabel"),
 
     // Link Modal
     linkModal: document.getElementById("linkModal"),
@@ -165,8 +191,10 @@
     bindFormEvents();
     bindModalEvents();
     bindExportEvents();
-    bindModeSwitcherEvents();
+    // bindModeSwitcherEvents(); // Removed connection mode selector
     bindPreviewViewTabs();
+    bindCloudSyncEvents();
+    updateCloudStatusUI();
     renderAll();
   }
 
@@ -188,6 +216,19 @@
     } catch (e) {
       console.warn("Could not load saved QR data", e);
     }
+  }
+
+  // Auto-sync debouncer
+  let autoSyncDebounceTimer = null;
+  function triggerAutoSync() {
+    if (!window.CloudSync || !window.CloudSync.isConfigured()) return;
+    const cfg = window.CloudSync.getConfig();
+    if (cfg.autoSync === false) return;
+
+    if (autoSyncDebounceTimer) clearTimeout(autoSyncDebounceTimer);
+    autoSyncDebounceTimer = setTimeout(() => {
+      syncProfileToCloud(false);
+    }, 1000);
   }
 
   // Persist to LocalStorage
@@ -225,6 +266,9 @@
       }
 
       localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(profiles));
+
+      // Trigger background sync to cloud database
+      triggerAutoSync();
     } catch (e) {
       console.warn("Could not persist QR data", e);
     }
@@ -232,6 +276,7 @@
 
   // Bind Mode Switcher
   function bindModeSwitcherEvents() {
+    if (!DOM.tabModeWifi) return;
     DOM.tabModeWifi.addEventListener("click", () => {
       setQRMode("wifi");
     });
@@ -261,20 +306,12 @@
     });
   }
 
-  function setQRMode(mode) {
-    currentModel.qrMode = mode;
-    DOM.tabModeWifi.classList.toggle("active", mode === "wifi" || mode === "web");
-    DOM.tabModeLocal.classList.toggle("active", mode === "portable" || mode === "local");
-    DOM.tabModeOffline.classList.toggle("active", mode === "offline");
-
-    if (mode === "offline") {
-      DOM.hostConfigRow.classList.add("hidden");
-    } else {
-      DOM.hostConfigRow.classList.remove("hidden");
-      DOM.inputHostAddress.value = currentModel.networkHost || getDefaultHost();
-      DOM.hostHintText.textContent = "🌐 Scans and loads your complete multi-link profile on any mobile phone.";
-    }
-
+    function setQRMode(mode) {
+    currentModel.qrMode = "wifi"; // Always dynamic permanent Wall QR
+    if (DOM.tabModeWifi) DOM.tabModeWifi.classList.add("active");
+    if (DOM.tabModeLocal) DOM.tabModeLocal.classList.remove("active");
+    if (DOM.tabModeOffline) DOM.tabModeOffline.classList.remove("active");
+    if (DOM.hostConfigRow) DOM.hostConfigRow.classList.add("hidden");
     renderLiveQR();
     persistData();
   }
@@ -651,14 +688,9 @@
   function renderLiveQR() {
     let qrData = "";
 
-    if (currentModel.qrMode === "offline") {
-      qrData = buildVCardPayload(currentModel);
-      DOM.qrTargetUrlText.textContent = `Offline Contact Card (${currentModel.name || "My Contact"})`;
-    } else {
-      const fullUrl = buildFullProfileUrl(currentModel.slug);
-      qrData = fullUrl;
-      DOM.qrTargetUrlText.textContent = fullUrl;
-    }
+    const fullUrl = buildFullProfileUrl(currentModel.slug);
+    qrData = fullUrl;
+    DOM.qrTargetUrlText.textContent = fullUrl;
 
     // Direct test links
     const directUrl = buildDirectLocalUrl(currentModel.slug);
@@ -686,7 +718,7 @@
     }
   }
 
-  // Build QR URL with phone scan host (embeds payload for serverless static deployment)
+  // Build QR URL with phone scan host
   function buildFullProfileUrl(slug) {
     let base = getDefaultHost();
     if (currentModel.networkHost && currentModel.networkHost.trim() !== "") {
@@ -694,13 +726,17 @@
     }
 
     const cleanSlug = slugify(slug || currentModel.slug || "profile");
-    const payload = encodeProfileData(currentModel);
-    return `${base}/profile.html?u=${encodeURIComponent(cleanSlug)}#d=${payload}`;
+
+    // Permanent dynamic link: QR never changes on wall when links are edited!
+    return `${base}/profile.html?u=${encodeURIComponent(cleanSlug)}`;
   }
 
   function buildDirectLocalUrl(slug) {
     const origin = getDefaultHost();
     const cleanSlug = slugify(slug || currentModel.slug || "profile");
+    if (currentModel.qrMode === "wifi" || currentModel.qrMode === "dynamic") {
+      return `${origin}/profile.html?u=${encodeURIComponent(cleanSlug)}`;
+    }
     const payload = encodeProfileData(currentModel);
     return `${origin}/profile.html?u=${encodeURIComponent(cleanSlug)}#d=${payload}`;
   }
@@ -987,25 +1023,13 @@
 
   function bindExportEvents() {
     DOM.btnCopyPageUrl.addEventListener("click", () => {
-      let url = "";
-      if (currentModel.qrMode === "offline") {
-        url = buildVCardPayload(currentModel);
-        copyToClipboard(url);
-        showToast("vCard text copied to clipboard!");
-      } else {
-        url = buildFullProfileUrl(currentModel.slug);
-        copyToClipboard(url);
-        showToast("Link copied to clipboard!");
-      }
+      const url = buildFullProfileUrl(currentModel.slug);
+      copyToClipboard(url);
+      showToast("Permanent profile link copied to clipboard!");
     });
 
     DOM.btnDownloadPNG.addEventListener("click", () => {
-      let qrData = "";
-      if (currentModel.qrMode === "offline") {
-        qrData = buildVCardPayload(currentModel);
-      } else {
-        qrData = buildFullProfileUrl(currentModel.slug);
-      }
+      const qrData = buildFullProfileUrl(currentModel.slug);
 
       const isDense = qrData.length > 200;
       const qrlib = window.QRCodeLib || window.QRCode;
@@ -1034,12 +1058,7 @@
     });
 
     DOM.btnDownloadSVG.addEventListener("click", () => {
-      let qrData = "";
-      if (currentModel.qrMode === "offline") {
-        qrData = buildVCardPayload(currentModel);
-      } else {
-        qrData = buildFullProfileUrl(currentModel.slug);
-      }
+      const qrData = buildFullProfileUrl(currentModel.slug);
 
       const isDense = qrData.length > 200;
       const qrlib = window.QRCodeLib || window.QRCode;
@@ -1069,6 +1088,224 @@
         });
       }
     });
+  }
+
+  // Dynamic Cloud Sync & Wall QR Controller
+  async function syncProfileToCloud(isManual = false) {
+    if (!window.CloudSync) return;
+
+    if (!window.CloudSync.isConfigured()) {
+      if (isManual) {
+        openCloudModal();
+        showToast("Please connect Supabase first to sync your wall QR.");
+      }
+      return;
+    }
+
+    if (!currentModel.slug) {
+      if (isManual) showToast("Please enter a profile name/slug first.");
+      return;
+    }
+
+    if (DOM.syncSpinIcon) DOM.syncSpinIcon.classList.remove("hidden");
+    if (DOM.btnSyncCloudNowLabel) DOM.btnSyncCloudNowLabel.textContent = "Syncing...";
+
+    try {
+      const res = await window.CloudSync.saveProfile(currentModel);
+      if (res.success) {
+        if (DOM.btnSyncCloudNowLabel) DOM.btnSyncCloudNowLabel.textContent = "Synced ✓";
+        if (isManual) {
+          showToast("⚡ Synced to Cloud! Your printed wall QR will show these changes.");
+        }
+        setTimeout(() => {
+          if (DOM.btnSyncCloudNowLabel) DOM.btnSyncCloudNowLabel.textContent = "Sync Changes";
+        }, 2500);
+      } else {
+        if (DOM.btnSyncCloudNowLabel) DOM.btnSyncCloudNowLabel.textContent = "Sync Failed";
+        if (isManual) {
+          showToast(`Cloud Sync Error: ${res.error}`);
+        }
+        setTimeout(() => {
+          if (DOM.btnSyncCloudNowLabel) DOM.btnSyncCloudNowLabel.textContent = "Sync Changes";
+        }, 3000);
+      }
+    } catch (err) {
+      console.error("syncProfileToCloud failed:", err);
+      if (DOM.btnSyncCloudNowLabel) DOM.btnSyncCloudNowLabel.textContent = "Sync Error";
+    } finally {
+      if (DOM.syncSpinIcon) DOM.syncSpinIcon.classList.add("hidden");
+    }
+  }
+
+  function updateCloudStatusUI() {
+    const isConn = Boolean(window.CloudSync && window.CloudSync.isConfigured());
+
+    // Navbar pill indicator
+    if (DOM.navCloudStatusDot) {
+      DOM.navCloudStatusDot.classList.toggle("connected", isConn);
+    }
+    if (DOM.navCloudStatusText) {
+      DOM.navCloudStatusText.textContent = isConn ? "Cloud Dynamic QR ✓" : "Connect Cloud QR";
+    }
+
+    // Dynamic sync card in QR Hero
+    if (DOM.dynamicSyncCard && currentModel.qrMode !== "portable") {
+      DOM.dynamicSyncCard.classList.toggle("local-mode", !isConn);
+      if (isConn) {
+        if (DOM.dynamicSyncTitle) DOM.dynamicSyncTitle.textContent = "Dynamic Wall QR (Live Sync Active)";
+        if (DOM.dynamicSyncDesc) DOM.dynamicSyncDesc.textContent = "Print once on your wall. Edits update live for all scanners without reprinting.";
+        if (DOM.btnSyncCloudNowLabel) DOM.btnSyncCloudNowLabel.textContent = "Sync Changes";
+      } else {
+        if (DOM.dynamicSyncTitle) DOM.dynamicSyncTitle.textContent = "Dynamic Wall QR (Local Only)";
+        if (DOM.dynamicSyncDesc) DOM.dynamicSyncDesc.textContent = "Connect free cloud database so phone scans get your latest links.";
+        if (DOM.btnSyncCloudNowLabel) DOM.btnSyncCloudNowLabel.textContent = "Connect Cloud";
+      }
+    }
+
+    // Modal status card
+    if (DOM.cloudStatusCard) {
+      DOM.cloudStatusCard.classList.toggle("connected", isConn);
+      if (DOM.cloudStatusHeader) {
+        DOM.cloudStatusHeader.textContent = isConn ? "Supabase Cloud Database Connected" : "Local Storage Only (Static)";
+      }
+      if (DOM.cloudStatusMessage) {
+        DOM.cloudStatusMessage.textContent = isConn
+          ? "Your wall QR code is live and dynamic! Changes save to cloud automatically."
+          : "Connect a free Supabase database so people scanning your wall QR always see your updated links.";
+      }
+    }
+  }
+
+  function bindCloudSyncEvents() {
+    if (DOM.btnOpenCloudSyncModal) {
+      DOM.btnOpenCloudSyncModal.addEventListener("click", openCloudModal);
+    }
+    if (DOM.btnCloseCloudModal) {
+      DOM.btnCloseCloudModal.addEventListener("click", closeCloudModal);
+    }
+    if (DOM.cloudSyncModal) {
+      DOM.cloudSyncModal.addEventListener("click", (e) => {
+        if (e.target === DOM.cloudSyncModal) closeCloudModal();
+      });
+    }
+
+    // Copy SQL button
+    if (DOM.btnCopySql) {
+      DOM.btnCopySql.addEventListener("click", () => {
+        const sql = DOM.sqlSnippetCode.textContent;
+        copyToClipboard(sql);
+        showToast("SQL script copied! Paste into Supabase SQL Editor.");
+      });
+    }
+
+    // Test connection button
+    if (DOM.btnTestCloudConnection) {
+      DOM.btnTestCloudConnection.addEventListener("click", async () => {
+        const url = DOM.inputSupabaseUrl.value.trim();
+        const key = DOM.inputSupabaseKey.value.trim();
+        DOM.btnTestCloudConnection.disabled = true;
+        DOM.btnTestCloudConnection.textContent = "Testing...";
+
+        const res = await window.CloudSync.testConnection(url, key);
+        DOM.btnTestCloudConnection.disabled = false;
+        DOM.btnTestCloudConnection.textContent = "Test Connection";
+
+        if (res.success) {
+          showToast("Connected to Supabase successfully!");
+        } else {
+          showToast(`Connection failed: ${res.error}`);
+        }
+      });
+    }
+
+    // Save cloud config button
+    if (DOM.btnSaveCloudConfig) {
+      DOM.btnSaveCloudConfig.addEventListener("click", async () => {
+        const url = DOM.inputSupabaseUrl.value.trim();
+        const key = DOM.inputSupabaseKey.value.trim();
+        const table = DOM.inputTableName.value.trim() || "profiles";
+        const autoSync = DOM.checkAutoSync.checked;
+
+        if (!url || !key) {
+          showToast("Please provide both Supabase Project URL and Anon API Key.");
+          return;
+        }
+
+        DOM.btnSaveCloudConfig.disabled = true;
+        DOM.btnSaveCloudConfig.textContent = "Connecting...";
+
+        const testRes = await window.CloudSync.testConnection(url, key);
+        if (!testRes.success && !testRes.tableMissing) {
+          DOM.btnSaveCloudConfig.disabled = false;
+          DOM.btnSaveCloudConfig.textContent = "Save & Connect";
+          showToast(`Connection error: ${testRes.error}`);
+          return;
+        }
+
+        window.CloudSync.saveConfig({
+          supabaseUrl: url,
+          supabaseKey: key,
+          tableName: table,
+          autoSync: autoSync,
+        });
+
+        DOM.btnSaveCloudConfig.disabled = false;
+        DOM.btnSaveCloudConfig.textContent = "Save & Connect";
+
+        updateCloudStatusUI();
+        closeCloudModal();
+        showToast("Supabase Connected! Syncing profile to cloud...");
+
+        // Immediately sync current profile
+        await syncProfileToCloud(true);
+      });
+    }
+
+    // Disconnect cloud button
+    if (DOM.btnDisconnectCloud) {
+      DOM.btnDisconnectCloud.addEventListener("click", () => {
+        if (confirm("Disconnect cloud database? Dynamic Wall QR will revert to local storage.")) {
+          window.CloudSync.saveConfig({
+            supabaseUrl: "",
+            supabaseKey: "",
+          });
+          updateCloudStatusUI();
+          closeCloudModal();
+          showToast("Cloud disconnected. Reverted to local mode.");
+        }
+      });
+    }
+
+    // Sync now button on dynamic card
+    if (DOM.btnSyncCloudNow) {
+      DOM.btnSyncCloudNow.addEventListener("click", () => {
+        if (!window.CloudSync.isConfigured()) {
+          openCloudModal();
+        } else {
+          syncProfileToCloud(true);
+        }
+      });
+    }
+  }
+
+  function openCloudModal() {
+    if (!window.CloudSync) return;
+    const cfg = window.CloudSync.getConfig();
+    if (DOM.inputSupabaseUrl) DOM.inputSupabaseUrl.value = cfg.supabaseUrl || "";
+    if (DOM.inputSupabaseKey) DOM.inputSupabaseKey.value = cfg.supabaseKey || "";
+    if (DOM.inputTableName) DOM.inputTableName.value = cfg.tableName || "profiles";
+    if (DOM.checkAutoSync) DOM.checkAutoSync.checked = cfg.autoSync !== false;
+
+    if (DOM.sqlSnippetCode) {
+      DOM.sqlSnippetCode.textContent = window.CloudSync.getSetupSQL(cfg.tableName || "profiles");
+    }
+
+    updateCloudStatusUI();
+    if (DOM.cloudSyncModal) DOM.cloudSyncModal.classList.remove("hidden");
+  }
+
+  function closeCloudModal() {
+    if (DOM.cloudSyncModal) DOM.cloudSyncModal.classList.add("hidden");
   }
 
   // Helpers

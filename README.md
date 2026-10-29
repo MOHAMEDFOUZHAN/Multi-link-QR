@@ -47,6 +47,7 @@ MULTI-LINK QR/
 ├── index.html              # Main dashboard, studio editor, live preview & analytics
 ├── styles.css              # Deep navy & clean white SaaS design system
 ├── app.js                  # Core application logic, storage service, QR generator
+├── cloud-sync.js           # Supabase cloud engine for Dynamic Wall QR codes
 ├── profile.html            # Public mobile-optimized landing page
 ├── profile.css             # Responsive public profile styling and theme system
 ├── profile.js              # Public page renderer, query parser & analytics logger
