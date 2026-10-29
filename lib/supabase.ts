@@ -39,6 +39,20 @@ export async function getProfileFromSupabase(slug: string): Promise<ClientProfil
 
     if (error || !data) return null;
 
+    // Check if links contains embedded meta
+    let rawLinks = Array.isArray(data.links) ? data.links : [];
+    let address = data.address || "";
+    let businessHours = data.business_hours || "";
+    let announcement = data.announcement || "";
+
+    const metaItem = rawLinks.find((l: any) => l && l.__isMeta === true);
+    if (metaItem) {
+      address = address || metaItem.address || "";
+      businessHours = businessHours || metaItem.businessHours || "";
+      announcement = announcement || metaItem.announcement || "";
+      rawLinks = rawLinks.filter((l: any) => l && l.__isMeta !== true);
+    }
+
     return {
       id: "cloud_" + data.slug,
       name: data.name || "Business Profile",
@@ -47,9 +61,9 @@ export async function getProfileFromSupabase(slug: string): Promise<ClientProfil
       avatarUrl: data.avatar_url || "",
       contactPhone: data.contact_phone || "",
       contactEmail: data.contact_email || "",
-      address: data.address || "",
-      businessHours: data.business_hours || "",
-      announcement: data.announcement || "",
+      address: address,
+      businessHours: businessHours,
+      announcement: announcement,
       theme: data.theme || "minimal",
       buttonShape: data.button_shape || "rounded",
       clientName: data.client_name || "",
@@ -61,7 +75,7 @@ export async function getProfileFromSupabase(slug: string): Promise<ClientProfil
       expiryDate: data.expiry_date || "",
       inactiveMessage: data.inactive_message || "",
       adminContact: data.admin_contact || "",
-      links: Array.isArray(data.links) ? data.links : [],
+      links: rawLinks,
       updatedAt: data.updated_at,
     };
   } catch (err) {
@@ -74,6 +88,25 @@ export async function saveProfileToSupabase(profile: ClientProfile): Promise<boo
   const sb = getSupabase();
   if (!sb || !profile.slug) return false;
 
+  const linksToSave = Array.isArray(profile.links)
+    ? profile.links.filter((l: any) => l && l.__isMeta !== true)
+    : [];
+
+  // If there's address, businessHours or announcement, embed them safely in links array so no schema error occurs
+  if (profile.address || profile.businessHours || profile.announcement) {
+    linksToSave.push({
+      id: "__meta__",
+      __isMeta: true,
+      address: profile.address || "",
+      businessHours: profile.businessHours || "",
+      announcement: profile.announcement || "",
+      linkType: "custom",
+      title: "",
+      destination: "",
+      isEnabled: false,
+    } as any);
+  }
+
   const record: Record<string, any> = {
     slug: profile.slug.trim().toLowerCase(),
     name: profile.name || "Business Profile",
@@ -83,7 +116,7 @@ export async function saveProfileToSupabase(profile: ClientProfile): Promise<boo
     contact_email: profile.contactEmail || "",
     theme: profile.theme || "minimal",
     button_shape: profile.buttonShape || "rounded",
-    links: Array.isArray(profile.links) ? profile.links : [],
+    links: linksToSave,
     client_name: profile.clientName || "",
     client_phone: profile.clientPhone || "",
     plan_price: String(profile.planPrice || "0"),
@@ -95,10 +128,6 @@ export async function saveProfileToSupabase(profile: ClientProfile): Promise<boo
     admin_contact: profile.adminContact || "",
     updated_at: new Date().toISOString(),
   };
-
-  if (profile.address !== undefined) record.address = profile.address;
-  if (profile.businessHours !== undefined) record.business_hours = profile.businessHours;
-  if (profile.announcement !== undefined) record.announcement = profile.announcement;
 
   try {
     const { error } = await sb.from("profiles").upsert(record, { onConflict: "slug" });
@@ -138,31 +167,46 @@ export async function fetchAllProfilesFromSupabase(): Promise<ClientProfile[]> {
 
     if (error || !data) return [];
 
-    return data.map((d) => ({
-      id: "cloud_" + d.slug,
-      name: d.name || "Business Profile",
-      slug: d.slug,
-      bio: d.bio || "",
-      avatarUrl: d.avatar_url || "",
-      contactPhone: d.contact_phone || "",
-      contactEmail: d.contact_email || "",
-      address: d.address || "",
-      businessHours: d.business_hours || "",
-      announcement: d.announcement || "",
-      theme: d.theme || "minimal",
-      buttonShape: d.button_shape || "rounded",
-      clientName: d.client_name || "",
-      clientPhone: d.client_phone || "",
-      planPrice: d.plan_price || "0",
-      currency: d.currency || "$",
-      billingCycle: d.billing_cycle || "monthly",
-      status: d.status || "active",
-      expiryDate: d.expiry_date || "",
-      inactiveMessage: d.inactive_message || "",
-      adminContact: d.admin_contact || "",
-      links: Array.isArray(d.links) ? d.links : [],
-      updatedAt: d.updated_at,
-    }));
+    return data.map((d) => {
+      let rawLinks = Array.isArray(d.links) ? d.links : [];
+      let address = d.address || "";
+      let businessHours = d.business_hours || "";
+      let announcement = d.announcement || "";
+
+      const metaItem = rawLinks.find((l: any) => l && l.__isMeta === true);
+      if (metaItem) {
+        address = address || metaItem.address || "";
+        businessHours = businessHours || metaItem.businessHours || "";
+        announcement = announcement || metaItem.announcement || "";
+        rawLinks = rawLinks.filter((l: any) => l && l.__isMeta !== true);
+      }
+
+      return {
+        id: "cloud_" + d.slug,
+        name: d.name || "Business Profile",
+        slug: d.slug,
+        bio: d.bio || "",
+        avatarUrl: d.avatar_url || "",
+        contactPhone: d.contact_phone || "",
+        contactEmail: d.contact_email || "",
+        address: address,
+        businessHours: businessHours,
+        announcement: announcement,
+        theme: d.theme || "minimal",
+        buttonShape: d.button_shape || "rounded",
+        clientName: d.client_name || "",
+        clientPhone: d.client_phone || "",
+        planPrice: d.plan_price || "0",
+        currency: d.currency || "$",
+        billingCycle: d.billing_cycle || "monthly",
+        status: d.status || "active",
+        expiryDate: d.expiry_date || "",
+        inactiveMessage: d.inactive_message || "",
+        adminContact: d.admin_contact || "",
+        links: rawLinks,
+        updatedAt: d.updated_at,
+      };
+    });
   } catch (err) {
     console.warn("fetchAllProfilesFromSupabase error:", err);
     return [];

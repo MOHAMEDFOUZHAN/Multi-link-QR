@@ -55,6 +55,8 @@ import {
   Eye,
   Check,
   Upload,
+  CloudUpload,
+  Settings,
   Image as ImageIcon,
 } from "lucide-react";
 import {
@@ -82,6 +84,12 @@ export default function AdminDashboard() {
   const [filterTab, setFilterTab] = useState<FilterTab>("all");
   const [sortBy, setSortBy] = useState<SortOption>("expiry");
   const [isCloudSyncing, setIsCloudSyncing] = useState(false);
+
+  // Production Domain Configuration (for Vercel & Live hosting)
+  const [customDomain, setCustomDomain] = useState<string>("");
+  const [customDomainInput, setCustomDomainInput] = useState<string>("");
+  const [isDomainModalOpen, setIsDomainModalOpen] = useState(false);
+  const [isLocalhost, setIsLocalhost] = useState(false);
 
   // Studio Form Model
   const [formModel, setFormModel] = useState<ClientProfile>(() => createBlankModel());
@@ -113,7 +121,53 @@ export default function AdminDashboard() {
     }, 3500);
   }
 
-  // 1. Initial Load: Load local storage, then sync with Supabase Cloud
+  // Detect localhost & load custom production domain
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const isLocal =
+        window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1";
+      setIsLocalhost(isLocal);
+
+      const saved = localStorage.getItem("maple_qr_base_domain");
+      if (saved) {
+        setCustomDomain(saved);
+        setCustomDomainInput(saved);
+      }
+    }
+  }, []);
+
+  // Helper to get base URL for all generated QR codes & Standees
+  function getTargetBaseUrl(): string {
+    if (customDomain && customDomain.trim()) {
+      let d = customDomain.trim().replace(/\/+$/, "");
+      if (!d.startsWith("http://") && !d.startsWith("https://")) {
+        d = "https://" + d;
+      }
+      return d;
+    }
+    return typeof window !== "undefined" ? window.location.origin : "https://mapleconnect.app";
+  }
+
+  // Save Production Domain
+  function handleSaveDomain() {
+    let d = customDomainInput.trim().replace(/\/+$/, "");
+    if (d && !d.startsWith("http://") && !d.startsWith("https://")) {
+      d = "https://" + d;
+    }
+    setCustomDomain(d);
+    if (typeof window !== "undefined") {
+      if (d) {
+        localStorage.setItem("maple_qr_base_domain", d);
+      } else {
+        localStorage.removeItem("maple_qr_base_domain");
+      }
+    }
+    setIsDomainModalOpen(false);
+    addToast(d ? `🌐 QR target domain set to: ${d}` : "QR domain reset to current origin.");
+  }
+
+  // 1. Initial Load: Load local storage, sync with Supabase Cloud
   useEffect(() => {
     const local = Storage.getAll();
     setClients(local);
@@ -121,6 +175,11 @@ export default function AdminDashboard() {
     async function syncCloud() {
       setIsCloudSyncing(true);
       try {
+        // Auto-push local profiles to Supabase so nothing is lost
+        for (const loc of local) {
+          saveProfileToSupabase(loc);
+        }
+
         const cloudProfiles = await fetchAllProfilesFromSupabase();
         if (cloudProfiles && cloudProfiles.length > 0) {
           const localMap = new Map<string, ClientProfile>();
@@ -148,10 +207,28 @@ export default function AdminDashboard() {
     syncCloud();
   }, []);
 
+  // 1-Click Push All Local to Cloud
+  async function handlePushLocalToCloud() {
+    setIsCloudSyncing(true);
+    try {
+      let count = 0;
+      for (const client of clients) {
+        const ok = await saveProfileToSupabase(client);
+        if (ok) count++;
+      }
+      addToast(`☁️ Pushed & verified ${count} shop(s) in Supabase Cloud!`);
+    } catch (err) {
+      console.error("Cloud push error:", err);
+      addToast("❌ Failed to push shops to Supabase.");
+    } finally {
+      setIsCloudSyncing(false);
+    }
+  }
+
   // 2. Generate Live QR for Studio Model
   useEffect(() => {
     let isCancelled = false;
-    const origin = typeof window !== "undefined" ? window.location.origin : "https://mapleconnect.app";
+    const origin = getTargetBaseUrl();
     const slug = formModel.slug ? formModel.slug.trim().toLowerCase() : "preview";
     const targetUrl = `${origin}/p/${slug}`;
 
@@ -171,7 +248,7 @@ export default function AdminDashboard() {
     return () => {
       isCancelled = true;
     };
-  }, [formModel.slug, formModel.qrDark, formModel.qrLight]);
+  }, [formModel.slug, formModel.qrDark, formModel.qrLight, customDomain]);
 
   // 3. Generate QR for Standee Modal when open
   useEffect(() => {
@@ -180,7 +257,7 @@ export default function AdminDashboard() {
       return;
     }
 
-    const origin = typeof window !== "undefined" ? window.location.origin : "https://mapleconnect.app";
+    const origin = getTargetBaseUrl();
     const targetUrl = `${origin}/p/${standeeClient.slug}`;
 
     QRCode.toDataURL(targetUrl, {
@@ -193,7 +270,7 @@ export default function AdminDashboard() {
     })
       .then((url) => setStandeeQrUrl(url))
       .catch((e) => console.error("Standee QR gen error:", e));
-  }, [standeeClient]);
+  }, [standeeClient, customDomain]);
 
   // Handle Logo File Upload & Canvas Compression
   async function handleLogoUpload(file: File) {
@@ -510,7 +587,7 @@ export default function AdminDashboard() {
   // Download Standee SVG
   async function handleDownloadStandeeSvg() {
     if (!standeeClient) return;
-    const origin = typeof window !== "undefined" ? window.location.origin : "https://mapleconnect.app";
+    const origin = getTargetBaseUrl();
     const targetUrl = `${origin}/p/${standeeClient.slug}`;
 
     try {
@@ -585,6 +662,30 @@ export default function AdminDashboard() {
           </div>
 
           <div className="navbar-actions">
+            {/* Live Domain Target Button */}
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => setIsDomainModalOpen(true)}
+              title="Configure live website domain for printed QR codes"
+            >
+              <Globe size={14} />
+              {customDomain ? customDomain.replace(/^https?:\/\//, "") : "Set Live Domain"}
+            </button>
+
+            {/* Push Local to Cloud Button */}
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={handlePushLocalToCloud}
+              disabled={isCloudSyncing}
+              title="Push all local shops and changes to Supabase Cloud"
+            >
+              <CloudUpload size={14} />
+              {isCloudSyncing ? "Pushing..." : "Push to Cloud"}
+            </button>
+
+            {/* Supabase Status Pill */}
             <div
               className="btn-cloud-pill"
               title="Connected to Supabase PostgreSQL Cloud Cluster"
@@ -616,6 +717,72 @@ export default function AdminDashboard() {
       {/* Main SaaS Content */}
       <main className="creator-container">
         {/* ========================================================================= */}
+        {/* BANNER: LOCALHOST SCANNING GUIDANCE */}
+        {/* ========================================================================= */}
+        {isLocalhost && !customDomain && (
+          <div
+            style={{
+              background: "#FFFBEB",
+              border: "1px solid #FDE68A",
+              borderRadius: "16px",
+              padding: "16px 20px",
+              marginBottom: "24px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: "14px",
+              boxShadow: "0 2px 8px rgba(245, 158, 11, 0.08)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: "50%",
+                  background: "#FEF3C7",
+                  color: "#D97706",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <AlertTriangle size={22} />
+              </div>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: "0.95rem", color: "#92400E" }}>
+                  Why didn&apos;t the QR code open on your phone?
+                </div>
+                <div style={{ fontSize: "0.825rem", color: "#B45309", marginTop: "2px" }}>
+                  Your QR code currently encodes <code>http://localhost:3000</code>. Phones cannot reach &quot;localhost&quot;. 
+                  Host on Vercel or set your Vercel URL below so anyone anywhere can scan it!
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="https://multi-link-qr.vercel.app"
+                style={{ width: "300px", padding: "8px 12px", fontSize: "0.85rem" }}
+                value={customDomainInput}
+                onChange={(e) => setCustomDomainInput(e.target.value)}
+              />
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={handleSaveDomain}
+              >
+                Save Live Domain
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
         {/* VIEW 1: CLIENTS DIRECTORY & SAAS RECURRING SUBSCRIPTIONS */}
         {/* ========================================================================= */}
         {activeTab === "directory" && (
@@ -627,17 +794,32 @@ export default function AdminDashboard() {
                 <h1 className="creator-title">Client Directory & Subscription Center</h1>
                 <p className="creator-subtitle">
                   Manage 100+ shop QR profiles, toggle active/unpaid kill switches, and issue high-res counter standees.
+                  {customDomain && (
+                    <span style={{ display: "block", marginTop: "4px", color: "#2563EB", fontWeight: 600 }}>
+                      🌐 Target Domain: {customDomain}
+                    </span>
+                  )}
                 </p>
               </div>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleStartNewClient}
-                style={{ alignSelf: "center" }}
-              >
-                <Plus size={18} />
-                Onboard New Client
-              </button>
+              <div style={{ display: "flex", gap: "10px", alignSelf: "center" }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handlePushLocalToCloud}
+                  disabled={isCloudSyncing}
+                >
+                  <CloudUpload size={16} />
+                  Push All to Cloud
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleStartNewClient}
+                >
+                  <Plus size={18} />
+                  Onboard New Client
+                </button>
+              </div>
             </div>
 
             {/* 5 KPI Metric Cards */}
@@ -2054,8 +2236,8 @@ export default function AdminDashboard() {
                   ) : (
                     <div style={{ width: "160px", height: "160px", margin: "0 auto" }} />
                   )}
-                  <div style={{ fontSize: "0.75rem", color: "#64748B", marginBottom: "10px" }}>
-                    Points to: <code>/p/{formModel.slug || "..."}</code>
+                  <div style={{ fontSize: "0.75rem", color: "#64748B", marginBottom: "10px", wordBreak: "break-all" }}>
+                    Target: <code>{getTargetBaseUrl()}/p/{formModel.slug || "..."}</code>
                   </div>
                   <Link
                     href={`/p/${formModel.slug || ""}`}
@@ -2122,7 +2304,7 @@ export default function AdminDashboard() {
 
                 <div className="standee-footer">
                   <div className="standee-url-text">
-                    mapleconnect.app/p/{standeeClient.slug}
+                    {getTargetBaseUrl().replace(/^https?:\/\//, "")}/p/{standeeClient.slug}
                   </div>
                   <div className="standee-brand-text">
                     POWERED BY MAPLE CONNECT QR AGENCY
@@ -2159,7 +2341,75 @@ export default function AdminDashboard() {
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL 2: DELETE CONFIRMATION */}
+      {/* MODAL 2: PRODUCTION DOMAIN CONFIGURATION */}
+      {/* ========================================================================= */}
+      {isDomainModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsDomainModalOpen(false)}>
+          <div
+            className="modal-box"
+            style={{ maxWidth: "480px" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h2 className="modal-title">Production Domain Settings</h2>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => setIsDomainModalOpen(false)}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: "20px" }}>
+              <p style={{ fontSize: "0.875rem", color: "#64748B", marginBottom: "16px", lineHeight: 1.5 }}>
+                Enter your live hosted website URL (e.g. from Vercel or your custom domain).
+                Every QR code generated, downloaded, or printed will automatically use this URL!
+              </p>
+
+              <div className="form-group">
+                <label className="form-label">Live App Domain / Vercel URL</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="https://multi-link-qr.vercel.app"
+                  value={customDomainInput}
+                  onChange={(e) => setCustomDomainInput(e.target.value)}
+                />
+                <span className="form-hint">
+                  Current target for QR codes: <strong>{getTargetBaseUrl()}</strong>
+                </span>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setCustomDomainInput("");
+                  setCustomDomain("");
+                  localStorage.removeItem("maple_qr_base_domain");
+                  setIsDomainModalOpen(false);
+                  addToast("Reset domain to current origin.");
+                }}
+              >
+                Reset to Default
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleSaveDomain}
+              >
+                Save Production Domain
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 3: DELETE CONFIRMATION */}
       {/* ========================================================================= */}
       {deleteTarget && (
         <div className="modal-overlay" onClick={() => setDeleteTarget(null)}>
@@ -2201,7 +2451,7 @@ export default function AdminDashboard() {
               </div>
               <p style={{ fontSize: "0.85rem", color: "#64748B", lineHeight: 1.5 }}>
                 This will delete their profile from cloud storage and local database. Any printed
-                QR codes pointing to <code>/p/{deleteTarget.slug}</code> will show "Profile Not Found".
+                QR codes pointing to <code>/p/{deleteTarget.slug}</code> will show &quot;Profile Not Found&quot;.
               </p>
             </div>
 
