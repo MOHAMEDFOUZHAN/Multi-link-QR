@@ -57,6 +57,9 @@ import {
   Upload,
   CloudUpload,
   Settings,
+  Lock,
+  Unlock,
+  Key,
   Image as ImageIcon,
 } from "lucide-react";
 import {
@@ -75,6 +78,13 @@ type FilterTab = "all" | "active" | "expiring" | "suspended" | "expired";
 type SortOption = "expiry" | "name" | "price" | "created";
 
 export default function AdminDashboard() {
+  // Agency Admin Security Shield
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
+  const [adminPin, setAdminPin] = useState("3110");
+  const [pinInput, setPinInput] = useState("");
+  const [pinError, setPinError] = useState("");
+  const [newPinInput, setNewPinInput] = useState("");
+
   // Navigation
   const [activeTab, setActiveTab] = useState<"directory" | "studio">("directory");
 
@@ -121,7 +131,7 @@ export default function AdminDashboard() {
     }, 3500);
   }
 
-  // Detect localhost & load custom production domain
+  // Detect localhost & load custom production domain & PIN
   useEffect(() => {
     if (typeof window !== "undefined") {
       const isLocal =
@@ -134,8 +144,39 @@ export default function AdminDashboard() {
         setCustomDomain(saved);
         setCustomDomainInput(saved);
       }
+
+      const savedPin = localStorage.getItem("maple_admin_pin") || "3110";
+      setAdminPin(savedPin);
+
+      const sessionAuth = sessionStorage.getItem("maple_admin_session");
+      if (sessionAuth === "unlocked") {
+        setIsAdminUnlocked(true);
+      }
     }
   }, []);
+
+  function handleUnlock(e: React.FormEvent) {
+    e.preventDefault();
+    if (pinInput.trim() === adminPin) {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("maple_admin_session", "unlocked");
+      }
+      setIsAdminUnlocked(true);
+      setPinError("");
+      setPinInput("");
+      addToast("🔓 Command Center unlocked!");
+    } else {
+      setPinError("Incorrect security PIN. Please try again.");
+    }
+  }
+
+  function handleLockDashboard() {
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("maple_admin_session");
+    }
+    setIsAdminUnlocked(false);
+    addToast("🔒 Command Center locked.");
+  }
 
   // Helper to get base URL for all generated QR codes & Standees
   function getTargetBaseUrl(): string {
@@ -325,7 +366,6 @@ export default function AdminDashboard() {
   const filteredClients = useMemo(() => {
     let result = [...clients];
 
-    // Search filter
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       result = result.filter((c) => {
@@ -337,7 +377,6 @@ export default function AdminDashboard() {
       });
     }
 
-    // Filter tab
     if (filterTab !== "all") {
       result = result.filter((c) => {
         const state = getSubscriptionState(c);
@@ -349,7 +388,6 @@ export default function AdminDashboard() {
       });
     }
 
-    // Sorting
     result.sort((a, b) => {
       if (sortBy === "expiry") {
         const da = a.expiryDate ? new Date(a.expiryDate).getTime() : 9999999999999;
@@ -614,6 +652,65 @@ export default function AdminDashboard() {
     }
   }
 
+  // =========================================================================
+  // ADMIN PASSCODE / PIN AUTHENTICATION GUARD
+  // =========================================================================
+  if (!isAdminUnlocked) {
+    return (
+      <div className="admin-lock-screen">
+        <form onSubmit={handleUnlock} className="admin-lock-card">
+          <div className="admin-lock-icon-wrap">
+            <Lock size={32} />
+          </div>
+
+          <h2 className="admin-lock-title">Agency Command Center</h2>
+          <p className="admin-lock-subtitle">
+            Enter your agency security PIN to manage 100+ client profiles, subscription status, and billing.
+          </p>
+
+          <input
+            type="password"
+            autoFocus
+            className="admin-lock-pin-input"
+            placeholder="••••"
+            maxLength={8}
+            value={pinInput}
+            onChange={(e) => {
+              setPinInput(e.target.value);
+              setPinError("");
+            }}
+          />
+
+          {pinError && (
+            <div style={{ color: "#EF4444", fontSize: "0.8rem", marginBottom: "14px", fontWeight: 600 }}>
+              {pinError}
+            </div>
+          )}
+
+          <button type="submit" className="btn-admin-unlock">
+            <ShieldCheck size={18} /> Unlock Dashboard
+          </button>
+
+          <div className="admin-lock-footer-text">
+            Default PIN: <strong style={{ color: "#94A3B8" }}>3110</strong> (Customizable in Settings)
+          </div>
+        </form>
+
+        {/* Toast Shelf */}
+        <div className="toast-shelf">
+          {toasts.map((t) => (
+            <div key={t.id} className="toast-pill">
+              {t.message}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // AUTHENTICATED COMMAND CENTER
+  // =========================================================================
   return (
     <div className="admin-app-root">
       {/* SaaS Navigation */}
@@ -662,15 +759,15 @@ export default function AdminDashboard() {
           </div>
 
           <div className="navbar-actions">
-            {/* Live Domain Target Button */}
+            {/* Live Domain Target & Settings Button */}
             <button
               type="button"
               className="btn btn-secondary btn-sm"
               onClick={() => setIsDomainModalOpen(true)}
-              title="Configure live website domain for printed QR codes"
+              title="Configure live website domain and security PIN"
             >
-              <Globe size={14} />
-              {customDomain ? customDomain.replace(/^https?:\/\//, "") : "Set Live Domain"}
+              <Settings size={14} />
+              {customDomain ? customDomain.replace(/^https?:\/\//, "") : "Settings"}
             </button>
 
             {/* Push Local to Cloud Button */}
@@ -710,15 +807,24 @@ export default function AdminDashboard() {
               <Plus size={16} />
               New Client
             </button>
+
+            {/* Lock Session Button */}
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={handleLockDashboard}
+              title="Lock Command Center Session"
+              style={{ color: "#94A3B8" }}
+            >
+              <Lock size={15} />
+            </button>
           </div>
         </div>
       </nav>
 
       {/* Main SaaS Content */}
       <main className="creator-container">
-        {/* ========================================================================= */}
-        {/* BANNER: LOCALHOST SCANNING GUIDANCE */}
-        {/* ========================================================================= */}
+        {/* Banner: Localhost Scanning Warning */}
         {isLocalhost && !customDomain && (
           <div
             style={{
@@ -782,12 +888,9 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ========================================================================= */}
-        {/* VIEW 1: CLIENTS DIRECTORY & SAAS RECURRING SUBSCRIPTIONS */}
-        {/* ========================================================================= */}
+        {/* VIEW 1: CLIENTS DIRECTORY */}
         {activeTab === "directory" && (
           <div>
-            {/* Hero / Header */}
             <div className="admin-hero-header">
               <div>
                 <span className="badge-pill">AGENCY COMMAND HUB</span>
@@ -875,7 +978,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Table Controls (Search, Filter, Sort) */}
+            {/* Table Controls */}
             <div className="table-controls-card">
               <div className="search-filter-row">
                 <div className="search-input-wrap">
@@ -999,7 +1102,6 @@ export default function AdminDashboard() {
 
                         return (
                           <tr key={client.slug || client.id}>
-                            {/* Business Identity */}
                             <td>
                               <div className="client-identity-box">
                                 <div className="client-table-avatar">
@@ -1030,7 +1132,6 @@ export default function AdminDashboard() {
                               </div>
                             </td>
 
-                            {/* Owner Info & WhatsApp Reminder */}
                             <td>
                               <div>
                                 <span className="client-owner-name">
@@ -1055,7 +1156,6 @@ export default function AdminDashboard() {
                               </div>
                             </td>
 
-                            {/* Plan & Pricing */}
                             <td>
                               <span className="plan-pill">
                                 {client.currency || "$"}
@@ -1066,7 +1166,6 @@ export default function AdminDashboard() {
                               </span>
                             </td>
 
-                            {/* Subscription Status & Due Date */}
                             <td>
                               <div className="status-badge-wrap">
                                 <div className={`status-pill ${sub.badgeClass}`}>
@@ -1079,7 +1178,6 @@ export default function AdminDashboard() {
                               </div>
                             </td>
 
-                            {/* 1-Click Kill Switch */}
                             <td>
                               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                 <label className="switch-toggle" title="Toggle Active / Suspended">
@@ -1102,7 +1200,6 @@ export default function AdminDashboard() {
                               </div>
                             </td>
 
-                            {/* Actions Toolbar */}
                             <td>
                               <div className="table-actions-group">
                                 <button
@@ -1153,9 +1250,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ========================================================================= */}
         {/* VIEW 2: QR STUDIO & GENERATOR */}
-        {/* ========================================================================= */}
         {activeTab === "studio" && (
           <form onSubmit={handleSaveStudioForm}>
             <div className="admin-hero-header">
@@ -1202,7 +1297,6 @@ export default function AdminDashboard() {
                   </div>
 
                   <div className="card-body">
-                    {/* Status Kill Switch */}
                     <div
                       style={{
                         display: "flex",
@@ -1248,7 +1342,6 @@ export default function AdminDashboard() {
                       </label>
                     </div>
 
-                    {/* Expiry Date with quick buttons */}
                     <div className="expiry-control-box">
                       <div className="expiry-header-row">
                         <div>
@@ -1321,7 +1414,6 @@ export default function AdminDashboard() {
                       />
                     </div>
 
-                    {/* Client Owner & Plan Fee */}
                     <div className="form-grid-3" style={{ marginTop: "16px" }}>
                       <div className="form-group">
                         <label className="form-label">Client / Owner Name</label>
@@ -1374,7 +1466,6 @@ export default function AdminDashboard() {
                       </div>
                     </div>
 
-                    {/* Inactive Custom Message & Agency Contact */}
                     <div className="form-grid-2" style={{ marginTop: "12px" }}>
                       <div className="form-group">
                         <label className="form-label">Custom Lock Screen Message</label>
@@ -1446,7 +1537,6 @@ export default function AdminDashboard() {
                         </div>
                       </div>
 
-                      {/* Hidden File Input */}
                       <input
                         type="file"
                         ref={fileInputRef}
@@ -1600,7 +1690,6 @@ export default function AdminDashboard() {
                       />
                     </div>
 
-                    {/* Meta Fields: Announcement, Address, Hours */}
                     <div className="form-grid-3">
                       <div className="form-group">
                         <label className="form-label">Announcement Banner (Optional)</label>
@@ -1685,7 +1774,6 @@ export default function AdminDashboard() {
                   </div>
 
                   <div className="card-body">
-                    {/* Quick Add Pills */}
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "16px" }}>
                       <button
                         type="button"
@@ -1738,7 +1826,6 @@ export default function AdminDashboard() {
                       </button>
                     </div>
 
-                    {/* Links List */}
                     <div className="links-stream">
                       {(formModel.links || []).length === 0 ? (
                         <div
@@ -1874,7 +1961,6 @@ export default function AdminDashboard() {
                   </div>
 
                   <div className="card-body">
-                    {/* Theme Selector */}
                     <div className="form-group">
                       <label className="form-label">Color Theme</label>
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "10px" }}>
@@ -1917,7 +2003,6 @@ export default function AdminDashboard() {
                       </div>
                     </div>
 
-                    {/* Button Shape Selector */}
                     <div className="form-group" style={{ marginTop: "16px" }}>
                       <label className="form-label">Button Shape</label>
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "10px" }}>
@@ -1945,7 +2030,6 @@ export default function AdminDashboard() {
                       </div>
                     </div>
 
-                    {/* QR Code Foreground & Background */}
                     <div className="form-grid-2" style={{ marginTop: "16px" }}>
                       <div className="form-group">
                         <label className="form-label">QR Dark Color</label>
@@ -1994,7 +2078,6 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* Bottom Action Row */}
                 <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "10px" }}>
                   <button
                     type="button"
@@ -2012,7 +2095,6 @@ export default function AdminDashboard() {
 
               {/* Sticky Smartphone & Live QR Preview Column */}
               <div style={{ position: "sticky", top: "85px", display: "flex", flexDirection: "column", gap: "16px" }}>
-                {/* Live Preview Mode Switcher */}
                 <div
                   style={{
                     display: "flex",
@@ -2044,7 +2126,6 @@ export default function AdminDashboard() {
                 <div className="smartphone-frame">
                   <div className={`smartphone-screen theme-${formModel.theme || "minimal"}`}>
                     {studioPreviewMode === "suspended" || formModel.status === "suspended" ? (
-                      /* Suspended Lock Preview */
                       <div className="profile-suspended" style={{ padding: "20px 14px", marginTop: "40px" }}>
                         <div
                           className="suspended-icon-box"
@@ -2087,7 +2168,6 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                     ) : (
-                      /* Active Phone View */
                       <>
                         {formModel.announcement && (
                           <div
@@ -2254,9 +2334,7 @@ export default function AdminDashboard() {
         )}
       </main>
 
-      {/* ========================================================================= */}
       {/* MODAL 1: ACRYLIC COUNTER STANDEE GENERATOR */}
-      {/* ========================================================================= */}
       {standeeClient && (
         <div className="modal-overlay" onClick={() => setStandeeClient(null)}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
@@ -2340,9 +2418,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* MODAL 2: PRODUCTION DOMAIN CONFIGURATION */}
-      {/* ========================================================================= */}
+      {/* MODAL 2: AGENCY SETTINGS & PRODUCTION DOMAIN */}
       {isDomainModalOpen && (
         <div className="modal-overlay" onClick={() => setIsDomainModalOpen(false)}>
           <div
@@ -2351,7 +2427,7 @@ export default function AdminDashboard() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="modal-header">
-              <h2 className="modal-title">Production Domain Settings</h2>
+              <h2 className="modal-title">Agency Settings & Security</h2>
               <button
                 type="button"
                 className="modal-close"
@@ -2362,13 +2438,8 @@ export default function AdminDashboard() {
             </div>
 
             <div style={{ padding: "20px" }}>
-              <p style={{ fontSize: "0.875rem", color: "#64748B", marginBottom: "16px", lineHeight: 1.5 }}>
-                Enter your live hosted website URL (e.g. from Vercel or your custom domain).
-                Every QR code generated, downloaded, or printed will automatically use this URL!
-              </p>
-
               <div className="form-group">
-                <label className="form-label">Live App Domain / Vercel URL</label>
+                <label className="form-label">Live Production Domain (Vercel)</label>
                 <input
                   type="text"
                   className="form-control"
@@ -2380,6 +2451,41 @@ export default function AdminDashboard() {
                   Current target for QR codes: <strong>{getTargetBaseUrl()}</strong>
                 </span>
               </div>
+
+              <div style={{ borderTop: "1px solid #E2E8F0", marginTop: "18px", paddingTop: "16px" }}>
+                <div className="form-group">
+                  <label className="form-label">Agency Security PIN</label>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <input
+                      type="password"
+                      className="form-control"
+                      placeholder="New PIN (min 4 digits)"
+                      maxLength={8}
+                      value={newPinInput}
+                      onChange={(e) => setNewPinInput(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => {
+                        if (newPinInput.trim().length >= 4) {
+                          setAdminPin(newPinInput.trim());
+                          if (typeof window !== "undefined") {
+                            localStorage.setItem("maple_admin_pin", newPinInput.trim());
+                          }
+                          setNewPinInput("");
+                          addToast("🔑 Security PIN updated!");
+                        } else {
+                          alert("PIN must be at least 4 digits.");
+                        }
+                      }}
+                    >
+                      Update PIN
+                    </button>
+                  </div>
+                  <span className="form-hint">Protects your agency dashboard from unauthorized access. Default: 3110</span>
+                </div>
+              </div>
             </div>
 
             <div className="modal-footer">
@@ -2389,28 +2495,28 @@ export default function AdminDashboard() {
                 onClick={() => {
                   setCustomDomainInput("");
                   setCustomDomain("");
-                  localStorage.removeItem("maple_qr_base_domain");
+                  if (typeof window !== "undefined") {
+                    localStorage.removeItem("maple_qr_base_domain");
+                  }
                   setIsDomainModalOpen(false);
                   addToast("Reset domain to current origin.");
                 }}
               >
-                Reset to Default
+                Reset Domain
               </button>
               <button
                 type="button"
                 className="btn btn-primary"
                 onClick={handleSaveDomain}
               >
-                Save Production Domain
+                Save Settings
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ========================================================================= */}
       {/* MODAL 3: DELETE CONFIRMATION */}
-      {/* ========================================================================= */}
       {deleteTarget && (
         <div className="modal-overlay" onClick={() => setDeleteTarget(null)}>
           <div

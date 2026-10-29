@@ -229,6 +229,10 @@ export default function ProfileClient({ slug, initialProfile }: ProfileClientPro
   // Format destination URL for seamless mobile app opening
   function formatLinkDestination(link: LinkItem): string {
     const dest = (link.destination || "").trim();
+    // Security: Block XSS via dangerous pseudo-protocols
+    if (/^(javascript|vbscript|data:text\/html|file):/i.test(dest)) {
+      return "#";
+    }
     if (link.linkType === "whatsapp") {
       if (dest.startsWith("http://") || dest.startsWith("https://")) return dest;
       const cleanNumber = dest.replace(/[^0-9]/g, "");
