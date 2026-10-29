@@ -4,12 +4,23 @@
   "description": "Maple Connect QR — One QR. Everything Connected. Modern Multi-Link QR Platform built with HTML5, CSS3, and Vanilla JavaScript.",
   "private": true,
   "scripts": {
-    "dev": "python -m http.server 3000",
-    "start": "python -m http.server 3000"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
+    "@types/node": "^26.6.6",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "lucide-react": "^1.64.0",
+    "next": "^16.4.3",
+    "qrcode": "^1.5.4",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "serve": "^14.2.4",
-    "qrcode": "^1.5.4"
+    "typescript": "^7.0.2"
   },
   "keywords": [
     "qr-code",

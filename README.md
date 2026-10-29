@@ -1,132 +1,134 @@
-# Maple Connect QR
+# Maple Connect QR — Multi-Client SaaS Agency Platform
 
-> **One QR. Everything Connected.**
+> **One QR. Everything Connected.** Built with **Next.js 16 (App Router)**, **React 19**, **TypeScript**, and **Supabase Cloud**.
 
-Maple Connect QR is a modern, lightweight, high-performance multi-link QR code web platform built entirely using standard web technologies: **HTML5**, **CSS3**, and **Vanilla JavaScript**.
-
-It requires **no frontend frameworks**, no compilation steps, and no heavyweight runtime dependencies.
+Maple Connect QR is a powerful, production-grade Multi-Link QR SaaS Agency platform engineered for agencies managing **100+ local shops and business clients**.
 
 ---
 
 ## 🚀 Key Features
 
-- **Multi-Link Profiles**: Create and customize mobile-optimized landing pages for businesses, restaurants, creators, or personal portfolios.
-- **15+ Destination Types**:
-  - Direct WhatsApp chat with optional prefilled text messages
-  - Social media profiles (Instagram, Facebook, YouTube, LinkedIn, TikTok, X)
-  - Google Maps & location directions
-  - Direct contact links (`tel:` and `mailto:`)
-  - Restaurant menus, online stores, Telegram, and custom URLs
-- **Live Interactive Phone Mockup**: Real-time smartphone preview that instantly reflects every typed character, color swatch, and theme change.
-- **High-Precision QR Engine**:
-  - Generates real, scannable QR codes representing public profile URLs
-  - Download high-res **PNG** (512px, 1024px, 2048px for print & billboards)
-  - Download crisp, infinitely scalable **SVG** vector files
-  - Optional center logo embed with protective white boundary for scanner safety
-  - Print-ready sheet generator
-- **Curated & Custom Themes**:
-  - 5 Predefined styles: *Minimal*, *Business*, *Premium*, *Creative*, and *Dark Mode*
-  - Granular control over background color, card/button color, accent colors, button shapes (rounded, pill, outline, soft, shadow), and typography
-- **Local Analytics Tracking**:
-  - Live impression counters and outbound click tracking
-  - Click-Through Rate (CTR) calculations
-  - Top-performing links breakdown with visual progress bars
-  - Chronological event stream
-- **Data Portability & Resilience**:
-  - Defensive JSON parsing with versioned client storage (`maple_qr_v1_profiles`)
-  - Single-click JSON backup export and import
-  - Portable hash-encoded profile payload for instant serverless cross-device scanning
-  - Zero server/framework runtime dependencies — ready for instant static deployment (Vercel, Netlify, GitHub Pages)
+- **👑 SaaS Agency Multi-Client Command Center (`/`)**:
+  - Manage 100+ local shop and business clients from a single command dashboard.
+  - Real-time KPI summary: Total Shops, Active Paid Clients (🟢), Expiring Soon (≤ 7 days ⚠️), Suspended/Unpaid (🔴), and Estimated Monthly Revenue ($).
+  - Search by shop name, owner name, phone, or slug; filter by Active, Expiring, Suspended, or Expired.
+  - Sort by due date, name, plan fee, or creation date.
+- **⚡ Instant 1-Click Kill-Switch**:
+  - Instant toggle switch to flip any client between **Active / Paid 🟢** and **Suspended / Unpaid 🔴**.
+  - Syncs instantly to **Supabase Cloud Database** and local storage.
+  - Permanent printed acrylic standee QR codes never need to be reprinted!
+- **🔒 Dynamic Lock Screen (`/p/[slug]`)**:
+  - When unpaid, suspended, or expired: customer scans are immediately redirected to a clean, professional **"Page Not Available / Subscription Expired"** lock screen.
+  - All shop links, phone numbers, menus, and socials remain completely suppressed.
+  - Displays a direct **"Contact Agency to Renew"** button via WhatsApp / phone.
+- **⏳ Auto-Expiration & Subscription Engine**:
+  - Set subscription validity dates (30 days, 90 days, 1 year, or lifetime).
+  - 1-click **Renew (+30 Days)** button extends validity instantly.
+  - Dynamic countdown badges (e.g. "Expires in 3 days", "Expired 2 days ago").
+  - 1-click **WhatsApp Payment Reminders** with prefilled polite messages to shop owners.
+- **🖨️ Acrylic Counter Standee & Print Generator**:
+  - Generates ready-to-print acrylic table standees with the client's shop name, tagline, "SCAN WITH PHONE CAMERA" badge, and high-contrast QR code.
+  - Direct 1-click print formatting (`window.print()`).
+  - Download high-res PNG (1024x1024px) for print shops.
+  - Download vector SVG for large-format signage.
+- **📱 Studio & Generator with Live Smartphone Mockup**:
+  - Interactive smartphone mockup that dynamically updates with shop name, avatar, bio, links, and themes.
+  - Toggle between **Preview Active Mode** and **Preview Suspended Lock** in real-time.
+  - 5 Curated Themes: *Minimal Light*, *Navy Business*, *Obsidian Azure*, *Royal Amethyst*, and *Pure Black*.
+  - Button Shapes: *Rounded (12px)*, *Pill (9999px)*, *Wire Outline*, and *Card Shadow*.
+  - 15+ destination types: WhatsApp, Instagram, Facebook, YouTube, LinkedIn, Google Maps, Phone, Email, Menu, Store, Website.
+  - Direct vCard (.vcf) download for customers to save shop contacts with 1 click.
 
 ---
 
-## 📁 Project Structure
+## 📁 Modern Next.js Architecture
 
 ```
 MULTI-LINK QR/
-├── index.html              # Main dashboard, studio editor, live preview & analytics
-├── styles.css              # Deep navy & clean white SaaS design system
-├── app.js                  # Core application logic, storage service, QR generator
-├── cloud-sync.js           # Supabase cloud engine for Dynamic Wall QR codes
-├── profile.html            # Public mobile-optimized landing page
-├── profile.css             # Responsive public profile styling and theme system
-├── profile.js              # Public page renderer, query parser & analytics logger
-├── assets/
-│   ├── logo.svg            # Official Maple Connect QR brand mark
-│   └── vendor/
-│       └── qrcode.min.js   # High-resolution vector QR code engine (ISO/IEC compliant)
-├── README.md               # Complete documentation and architecture guide
-└── package.json            # Minimal development scripts and lightweight server
+├── app/
+│   ├── layout.tsx              # Root HTML & metadata layout
+│   ├── page.tsx                # Admin SaaS Command Center & Studio (React Client)
+│   ├── globals.css             # Unified SaaS design system & theme stylesheets
+│   └── p/
+│       └── [slug]/
+│           ├── page.tsx        # Public QR scanner landing page (Server Component)
+│           └── ProfileClient.tsx # Interactive profile & lock screen (Client Component)
+├── lib/
+│   ├── types.ts                # TypeScript data models & subscription types
+│   ├── supabase.ts             # Supabase cloud database client & sync methods
+│   ├── storage.ts              # LocalStorage cache, expiry calculations & purger
+│   └── brand-icons.tsx         # Optimized SVG icons for Instagram, Facebook, YouTube, LinkedIn
+├── public/
+│   └── assets/
+│       └── logo.svg            # Agency logo mark
+├── .env                        # Supabase Cloud URL & Publishable Key
+├── next.config.ts              # Next.js configuration
+├── package.json                # Next.js 16, React 19, TypeScript, QRCode, Supabase
+└── tsconfig.json               # Path aliases (@/*) and TypeScript configuration
 ```
 
 ---
 
-## 🛠️ Local Development & Quick Start
+## ⚙️ Quick Start
 
-### Prerequisites
-- Node.js (v18 or higher recommended) to run the local development server.
-
-### 1. Install dependencies
+### 1. Install Dependencies
 ```bash
 npm install
 ```
 
-### 2. Start the local server
+### 2. Configure Supabase Cloud (Already in `.env`)
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://igbqdesjyepguqrluxlu.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_knwjJsGcS-4tz9mHNW5_gw_cKoTnnlg
+```
+
+#### Supabase Database Table Schema (Run in Supabase SQL Editor if starting from scratch):
+```sql
+CREATE TABLE IF NOT EXISTS public.profiles (
+  slug text PRIMARY KEY,
+  name text NOT NULL,
+  bio text,
+  avatar_url text,
+  contact_phone text,
+  contact_email text,
+  theme text DEFAULT 'minimal',
+  button_shape text DEFAULT 'rounded',
+  links jsonb DEFAULT '[]'::jsonb,
+  client_name text,
+  client_phone text,
+  plan_price text DEFAULT '25',
+  currency text DEFAULT '$',
+  billing_cycle text DEFAULT 'monthly',
+  status text DEFAULT 'active',
+  expiry_date text,
+  inactive_message text,
+  admin_contact text,
+  updated_at timestamp with time zone DEFAULT now()
+);
+
+-- Enable Row Level Security (RLS)
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+-- Allow public read access (for QR code scanners)
+CREATE POLICY "Allow public read access"
+  ON public.profiles FOR SELECT
+  USING (true);
+
+-- Allow public upsert/write
+CREATE POLICY "Allow public insert and update"
+  ON public.profiles FOR ALL
+  USING (true)
+  WITH CHECK (true);
+```
+
+### 3. Run Development Server
 ```bash
 npm run dev
 ```
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-The application will start immediately at:
+### 4. Build for Production
+```bash
+npm run build
+npm run start
 ```
-http://localhost:3000
-```
-
-> **Why use a local server instead of double-clicking `index.html`?**  
-> Modern browsers enforce security restrictions (such as CORS and clipboard API access) on the `file:///` protocol. Running through `npm run dev` (powered by the lightweight `serve` utility) ensures full compatibility with the Clipboard API, local downloads, and canvas drawing.
-
----
-
-## ⚡ Deploying to Vercel
-
-This platform is 100% static HTML5, CSS3, and Vanilla JavaScript with zero server dependencies, making it instantly deployable to Vercel:
-
-1. Import this repository in [Vercel](https://vercel.com/new).
-2. Framework Preset: Choose **Other**.
-3. Root Directory: `./` (default).
-4. Click **Deploy**.
-
-Vercel will deploy your multi-link landing page and QR studio in under 30 seconds. All generated QR codes will automatically use your live Vercel domain (`https://*.vercel.app`) for seamless mobile camera scanning worldwide!
-
----
-
-## 📐 Architecture: Future Backend Readiness
-
-All client data persistence is isolated behind `StorageService` inside `app.js` and `profile.js`:
-
-```javascript
-// StorageService interface:
-StorageService.getProfiles()
-StorageService.getProfileById(id)
-StorageService.getProfileBySlug(slug)
-StorageService.createProfile(data)
-StorageService.updateProfile(id, updates)
-StorageService.deleteProfile(id)
-StorageService.duplicateProfile(id)
-StorageService.getAnalyticsEvents()
-```
-
-### Swapping to a Backend (MySQL / REST API)
-Because the UI never interacts directly with low-level `localStorage` calls across components, upgrading to a cloud database (MySQL/PostgreSQL) and backend API (e.g. Node/Express, Go, or Python) requires modifying **only** the `StorageService` methods to execute `fetch('/api/profiles')` requests. The dashboard, studio, live preview, and QR generation remain 100% intact.
-
----
-
-## ⚠️ Prototype Storage Notice
-
-- In this prototype version, all profile data, customization settings, and analytics events are persisted in the **browser's LocalStorage**.
-- Profiles created in one browser are specific to that browser on that device.
-- For public sharing across the open internet, the application can be connected to a centralized cloud backend and hosted on a public domain.
-
----
-
-## 📄 License
-MIT License. Created for Maple Connect QR.
