@@ -1662,6 +1662,66 @@ body {
   box-shadow: 0 12px 25px -4px rgba(37, 99, 235, 0.5);
 }
 
+.contact-saved-notice-box {
+  width: 100%;
+  margin-top: 14px;
+  background: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  border-radius: 14px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  animation: fadeIn 0.25s ease;
+}
+
+.contact-saved-notice-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  text-align: left;
+}
+
+.contact-saved-notice-content .notice-icon {
+  color: #16A34A;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.contact-saved-notice-content .notice-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.78rem;
+  color: #1E293B;
+  line-height: 1.35;
+}
+
+.contact-saved-notice-content .notice-text strong {
+  font-size: 0.82rem;
+  color: #15803D;
+  font-weight: 700;
+}
+
+.notice-close-btn {
+  background: transparent;
+  border: none;
+  color: #64748B;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  flex-shrink: 0;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.notice-close-btn:hover {
+  color: #0F172A;
+  background: rgba(0, 0, 0, 0.05);
+}
+
 .profile-contact-shortcuts {
   display: flex;
   align-items: center;

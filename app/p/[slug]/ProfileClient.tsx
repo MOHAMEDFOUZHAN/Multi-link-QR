@@ -55,6 +55,7 @@ export default function ProfileClient({ slug, initialProfile }: ProfileClientPro
   const [showQrModal, setShowQrModal] = useState(false);
   const [qrModalDataUrl, setQrModalDataUrl] = useState<string>("");
   const [linkClicks, setLinkClicks] = useState<Record<string, number>>({});
+  const [contactSavedNotice, setContactSavedNotice] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -117,33 +118,70 @@ export default function ProfileClient({ slug, initialProfile }: ProfileClientPro
   }, [showQrModal, qrModalDataUrl, slug, profile?.qrDark, profile?.qrLight]);
 
   // Save Contact as vCard (.vcf)
-  function handleSaveContact() {
+  async function handleSaveContact() {
     if (!profile) return;
+
+    const rawPhone =
+      profile.contactPhone ||
+      profile.clientPhone ||
+      profile.links?.find((l) => l.linkType === "phone")?.destination ||
+      profile.links?.find((l) => l.linkType === "whatsapp")?.destination ||
+      "";
+    const phone = rawPhone.replace(/[^0-9+]/g, "");
+
+    const rawEmail =
+      profile.contactEmail ||
+      profile.links?.find((l) => l.linkType === "email")?.destination ||
+      "";
+
     const vCard = [
       "BEGIN:VCARD",
       "VERSION:3.0",
-      `FN:${profile.name || "Business Profile"}`,
-      `ORG:${profile.name || "Business"}`,
-      `TITLE:${profile.bio || "Official Profile"}`,
-      profile.contactPhone ? `TEL;TYPE=WORK,VOICE:${profile.contactPhone}` : "",
-      profile.contactEmail ? `EMAIL;TYPE=WORK,INTERNET:${profile.contactEmail}` : "",
-      profile.address ? `ADR;TYPE=WORK:;;${profile.address};;;;` : "",
+      `FN;CHARSET=UTF-8:${profile.name || "Business Profile"}`,
+      `N;CHARSET=UTF-8:;${profile.name || "Business Profile"};;;`,
+      `ORG;CHARSET=UTF-8:${profile.name || "Business"}`,
+      `TITLE;CHARSET=UTF-8:${profile.bio || profile.clientName || "Official Profile"}`,
+      phone ? `TEL;TYPE=CELL,VOICE,PREF:${phone}` : "",
+      rawEmail ? `EMAIL;TYPE=WORK,INTERNET:${rawEmail}` : "",
+      profile.address ? `ADR;TYPE=WORK;CHARSET=UTF-8:;;${profile.address};;;;` : "",
       typeof window !== "undefined" ? `URL:${window.location.href}` : "",
-      "NOTE:Verified business destination powered by Maple Connect QR",
+      "NOTE;CHARSET=UTF-8:Verified business destination powered by Maple Connect QR",
       "END:VCARD",
     ]
       .filter(Boolean)
       .join("\r\n");
 
-    const blob = new Blob([vCard], { type: "text/vcard;charset=utf-8" });
+    const fileName = `${(profile.slug || "contact").replace(/[^a-z0-9_-]/gi, "_")}.vcf`;
+
+    // Modern mobile file sharing: If supported, invokes native OS Contacts sheet directly
+    if (typeof navigator !== "undefined" && navigator.canShare) {
+      try {
+        const file = new File([vCard], fileName, { type: "text/x-vcard" });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: profile.name || "Business Profile",
+          });
+          setContactSavedNotice(true);
+          return;
+        }
+      } catch (err: any) {
+        if (err?.name === "AbortError") return;
+      }
+    }
+
+    // Direct download with MIME type recognized by mobile OS contact importers
+    const blob = new Blob([vCard], { type: "text/x-vcard;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${(profile.slug || "contact").replace(/[^a-z0-9_-]/gi, "_")}.vcf`;
+    link.download = fileName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+
+    setContactSavedNotice(true);
   }
 
   // Share Link via Web Share API or Clipboard
@@ -440,7 +478,19 @@ export default function ProfileClient({ slug, initialProfile }: ProfileClientPro
   // =========================================================================
   // ACTIVE VERIFIED PROFILE VIEW (TOP TIER EXPERIENCE)
   // =========================================================================
-  const cleanPhone = (profile.contactPhone || "").replace(/[^0-9+]/g, "");
+  const rawPhone =
+    profile.contactPhone ||
+    profile.clientPhone ||
+    profile.links?.find((l) => l.linkType === "phone")?.destination ||
+    profile.links?.find((l) => l.linkType === "whatsapp")?.destination ||
+    "";
+  const cleanPhone = rawPhone.replace(/[^0-9+]/g, "");
+
+  const rawEmail =
+    profile.contactEmail ||
+    profile.links?.find((l) => l.linkType === "email")?.destination ||
+    "";
+
   const waContactUrl = cleanPhone
     ? `https://wa.me/${cleanPhone.replace(/^\+/, "")}?text=${encodeURIComponent(
         `Hi ${profile.name}, I scanned your counter QR standee and would like to connect!`
@@ -531,7 +581,7 @@ export default function ProfileClient({ slug, initialProfile }: ProfileClientPro
           )}
 
           {/* Primary Action Button: Save Contact to Phone (vCard) */}
-          {(profile.contactPhone || profile.contactEmail || profile.name) && (
+          {(cleanPhone || rawEmail || profile.name) && (
             <div className="profile-save-contact-row">
               <button
                 type="button"
@@ -545,13 +595,34 @@ export default function ProfileClient({ slug, initialProfile }: ProfileClientPro
             </div>
           )}
 
+          {/* Quick Helper Notice if file was downloaded */}
+          {contactSavedNotice && (
+            <div className="contact-saved-notice-box">
+              <div className="contact-saved-notice-content">
+                <CheckCircle2 size={18} className="notice-icon" />
+                <div className="notice-text">
+                  <strong>Contact Card Downloaded!</strong>
+                  <span>Tap downloaded notification to save. If it shows code, tap <strong>⋮</strong> &rarr; <em>Open with Contacts</em>.</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="notice-close-btn"
+                onClick={() => setContactSavedNotice(false)}
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           {/* Quick Shortcuts Bar (Call, WhatsApp, Email, Maps, Share, Show QR) */}
           <div className="profile-contact-shortcuts">
-            {profile.contactPhone && (
+            {cleanPhone && (
               <a
                 href={`tel:${cleanPhone}`}
                 className="contact-pill-btn"
-                title={`Call ${profile.contactPhone}`}
+                title={`Call ${cleanPhone}`}
               >
                 <Phone size={19} />
               </a>
@@ -581,11 +652,11 @@ export default function ProfileClient({ slug, initialProfile }: ProfileClientPro
               </a>
             )}
 
-            {profile.contactEmail && (
+            {rawEmail && (
               <a
-                href={`mailto:${profile.contactEmail}`}
+                href={`mailto:${rawEmail}`}
                 className="contact-pill-btn"
-                title={`Email ${profile.contactEmail}`}
+                title={`Email ${rawEmail}`}
               >
                 <Mail size={19} />
               </a>
