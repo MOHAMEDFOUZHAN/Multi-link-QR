@@ -226,6 +226,28 @@ export default function ProfileClient({ slug, initialProfile }: ProfileClientPro
     }
   }
 
+  // Format destination URL for seamless mobile app opening
+  function formatLinkDestination(link: LinkItem): string {
+    const dest = (link.destination || "").trim();
+    if (link.linkType === "whatsapp") {
+      if (dest.startsWith("http://") || dest.startsWith("https://")) return dest;
+      const cleanNumber = dest.replace(/[^0-9]/g, "");
+      return `https://wa.me/${cleanNumber}`;
+    }
+    if (link.linkType === "phone") {
+      if (dest.startsWith("tel:")) return dest;
+      return `tel:${dest.replace(/[^0-9+]/g, "")}`;
+    }
+    if (link.linkType === "email") {
+      if (dest.startsWith("mailto:")) return dest;
+      return `mailto:${dest}`;
+    }
+    if (!dest.startsWith("http://") && !dest.startsWith("https://")) {
+      return `https://${dest}`;
+    }
+    return dest;
+  }
+
   // Categories helper
   const availableCategories = useMemo(() => {
     if (!profile || !profile.links) return ["all"];
@@ -688,7 +710,7 @@ export default function ProfileClient({ slug, initialProfile }: ProfileClientPro
               return (
                 <a
                   key={link.id}
-                  href={link.destination}
+                  href={formatLinkDestination(link)}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => handleLinkClick(link.id)}
