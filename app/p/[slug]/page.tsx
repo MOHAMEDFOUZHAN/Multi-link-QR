@@ -20,8 +20,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       };
     }
     return {
-      title: `${profile.name} — Maple Connect QR`,
-      description: profile.bio || `Official links and contact card for ${profile.name}`,
+      title: `${profile.name} — Connected by Maple Connect (Unit of Maple Pro)`,
+      description: profile.bio || `Official links and contact card for ${profile.name}. Connected by Maple Connect (Unit of Maple Pro)`,
       openGraph: {
         title: profile.name,
         description: profile.bio || `Connect with ${profile.name}`,

@@ -9,9 +9,9 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Maple Connect QR — Multi-Client SaaS Agency Platform",
+  title: "Maple Connect — Unit of Maple Pro | Agency SaaS QR Platform",
   description:
-    "Manage 100+ business clients, monitor subscription dates, toggle active/unpaid status, and generate permanent printed QR codes.",
+    "Connected by Maple Connect (Unit of Maple Pro). Manage 100+ business clients, monitor subscription dates, toggle active/unpaid status, and generate permanent printed QR codes.",
   icons: {
     icon: "/assets/logo.svg",
   },

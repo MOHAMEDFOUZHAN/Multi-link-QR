@@ -145,7 +145,7 @@ export default function ProfileClient({ slug, initialProfile }: ProfileClientPro
       rawEmail ? `EMAIL;TYPE=WORK,INTERNET:${rawEmail}` : "",
       profile.address ? `ADR;TYPE=WORK;CHARSET=UTF-8:;;${profile.address};;;;` : "",
       typeof window !== "undefined" ? `URL:${window.location.href}` : "",
-      "NOTE;CHARSET=UTF-8:Verified business destination powered by Maple Connect QR",
+      "NOTE;CHARSET=UTF-8:Connected by Maple Connect - Unit of Maple Pro",
       "END:VCARD",
     ]
       .filter(Boolean)
@@ -467,7 +467,7 @@ export default function ProfileClient({ slug, initialProfile }: ProfileClientPro
             </div>
 
             <div className="suspended-footer">
-              Maple Connect QR Agency Infrastructure &bull; Protected Node
+              Connected by Maple Connect &bull; Unit of Maple Pro
             </div>
           </div>
         </div>
@@ -829,7 +829,12 @@ export default function ProfileClient({ slug, initialProfile }: ProfileClientPro
         {/* Footer Brand Badge */}
         <footer className="profile-footer">
           <Link href="/" className="footer-badge">
-            Powered by <strong>Maple Connect QR</strong>
+            <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
+              <span>Connected by <strong>Maple Connect</strong></span>
+              <span style={{ fontSize: "0.68rem", opacity: 0.82, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                Unit of Maple Pro
+              </span>
+            </span>
           </Link>
         </footer>
       </div>

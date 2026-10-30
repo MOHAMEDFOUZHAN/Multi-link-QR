@@ -28,7 +28,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   Clock,
-  DollarSign,
+  IndianRupee,
   Plus,
   Search,
   RotateCw,
@@ -552,14 +552,15 @@ export default function AdminDashboard() {
     const state = getSubscriptionState(client);
     let msg = "";
 
+    const curr = client.currency && client.currency !== "$" ? client.currency : "₹";
     if (state.type === "expired") {
-      msg = `Hello ${client.clientName || client.name}, your Maple QR subscription expired on ${client.expiryDate}. The QR page is currently suspended for customers. Please process payment of ${client.currency || "$"}${client.planPrice} to restore your page immediately. Thank you!`;
+      msg = `Hello ${client.clientName || client.name}, your Maple Connect QR subscription expired on ${client.expiryDate}. The QR page is currently suspended for customers. Please process payment of ${curr}${client.planPrice} to restore your page immediately. Thank you! - Connected by Maple Connect (Unit of Maple Pro)`;
     } else if (state.type === "expiring") {
-      msg = `Hello ${client.clientName || client.name}, friendly reminder that your Maple QR subscription is due for renewal on ${client.expiryDate} (${client.currency || "$"}${client.planPrice}). Renewing early keeps your counter QR standee uninterrupted!`;
+      msg = `Hello ${client.clientName || client.name}, friendly reminder that your Maple Connect QR subscription is due for renewal on ${client.expiryDate} (${curr}${client.planPrice}). Renewing early keeps your counter QR standee uninterrupted! - Connected by Maple Connect (Unit of Maple Pro)`;
     } else if (state.type === "suspended") {
-      msg = `Hello ${client.clientName || client.name}, your Maple QR profile is currently paused. Please let us know once the payment of ${client.currency || "$"}${client.planPrice} is complete so we can re-activate your counter QR page immediately.`;
+      msg = `Hello ${client.clientName || client.name}, your Maple Connect QR profile is currently paused. Please let us know once the payment of ${curr}${client.planPrice} is complete so we can re-activate your counter QR page immediately. - Connected by Maple Connect (Unit of Maple Pro)`;
     } else {
-      msg = `Hello ${client.clientName || client.name}, checking in from Maple Connect QR. Your counter QR profile is active and valid until ${client.expiryDate || "Lifetime"}. Let us know if you need any link updates!`;
+      msg = `Hello ${client.clientName || client.name}, checking in from Maple Connect (Unit of Maple Pro). Your counter QR profile is active and valid until ${client.expiryDate || "Lifetime"}. Let us know if you need any link updates!`;
     }
 
     const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
@@ -813,8 +814,13 @@ export default function AdminDashboard() {
               <QrCode size={22} />
             </div>
             <div>
-              <span className="navbar-brand-title">Maple Connect</span>
-              <span className="admin-brand-tag">AGENCY SAAS</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span className="navbar-brand-title">Maple Connect</span>
+                <span className="admin-brand-tag">AGENCY SAAS</span>
+              </div>
+              <div style={{ fontSize: "0.68rem", color: "#64748B", fontWeight: 600, letterSpacing: "0.02em" }}>
+                Connected by Maple Connect &bull; Unit of Maple Pro
+              </div>
             </div>
           </div>
 
@@ -1049,10 +1055,10 @@ export default function AdminDashboard() {
 
               <div className="kpi-card">
                 <div className="kpi-icon-wrap icon-revenue">
-                  <DollarSign size={24} />
+                  <IndianRupee size={24} />
                 </div>
                 <div className="kpi-content">
-                  <span className="kpi-value">${kpis.revenue.toLocaleString()}</span>
+                  <span className="kpi-value">₹{kpis.revenue.toLocaleString("en-IN")}</span>
                   <span className="kpi-label">Est. Monthly Revenue</span>
                 </div>
               </div>
@@ -1275,7 +1281,7 @@ export default function AdminDashboard() {
                               <div className="status-badge-wrap">
                                 <div className="status-plan-row">
                                   <span className="plan-pill">
-                                    {client.currency || "$"}{client.planPrice}
+                                    {(client.currency && client.currency !== "$") ? client.currency : "₹"}{client.planPrice}
                                   </span>
                                   <div className={`status-pill ${sub.badgeClass}`}>
                                     <span className="status-dot-mini" />
@@ -1552,7 +1558,7 @@ export default function AdminDashboard() {
                             type="text"
                             className="form-control"
                             style={{ width: "50px", textAlign: "center" }}
-                            value={formModel.currency || "$"}
+                            value={(formModel.currency && formModel.currency !== "$") ? formModel.currency : "₹"}
                             onChange={(e) =>
                               setFormModel((prev) => ({ ...prev, currency: e.target.value }))
                             }
@@ -1560,7 +1566,7 @@ export default function AdminDashboard() {
                           <input
                             type="number"
                             className="form-control"
-                            placeholder="25"
+                            placeholder="499"
                             value={formModel.planPrice || ""}
                             onChange={(e) =>
                               setFormModel((prev) => ({ ...prev, planPrice: e.target.value }))
@@ -2412,7 +2418,10 @@ export default function AdminDashboard() {
                         </div>
 
                         <div className="phone-footer">
-                          Powered by <strong>Maple Connect</strong>
+                          <div>Connected by <strong>Maple Connect</strong></div>
+                          <div style={{ fontSize: "0.62rem", opacity: 0.75, letterSpacing: "0.03em", textTransform: "uppercase" }}>
+                            Unit of Maple Pro
+                          </div>
                         </div>
                       </>
                     )}
@@ -2586,7 +2595,7 @@ export default function AdminDashboard() {
                       <div className="detail-field">
                         <span className="detail-field-label">Billing Rate</span>
                         <span className="detail-field-value">
-                          {detailClient.currency || "$"}{detailClient.planPrice} / {detailClient.billingCycle || "month"}
+                          {(detailClient.currency && detailClient.currency !== "$") ? detailClient.currency : "₹"}{detailClient.planPrice} / {detailClient.billingCycle || "month"}
                         </span>
                       </div>
                     </div>
@@ -2817,7 +2826,7 @@ export default function AdminDashboard() {
                     {getTargetBaseUrl().replace(/^https?:\/\//, "")}/p/{standeeClient.slug}
                   </div>
                   <div className="standee-brand-text">
-                    POWERED BY MAPLE CONNECT QR AGENCY
+                    CONNECTED BY MAPLE CONNECT &bull; UNIT OF MAPLE PRO
                   </div>
                 </div>
               </div>

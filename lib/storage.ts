@@ -26,8 +26,8 @@ export function createBlankModel(override: Partial<ClientProfile> = {}): ClientP
     links: [],
     clientName: "",
     clientPhone: "",
-    planPrice: "25",
-    currency: "$",
+    planPrice: "499",
+    currency: "₹",
     billingCycle: "monthly",
     status: "active",
     expiryDate: getDefaultExpiryDate(30),
@@ -48,15 +48,20 @@ export const Storage = {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
           // Filter out legacy dummy data
-          return parsed.filter((p) => {
-            const name = String(p.name || "").toLowerCase();
-            const slug = String(p.slug || "").toLowerCase();
-            const isDemo =
-              (p.id && String(p.id).startsWith("demo_")) ||
-              name.includes("alex morgan") ||
-              slug.includes("alex-morgan");
-            return !isDemo;
-          });
+          return parsed
+            .filter((p) => {
+              const name = String(p.name || "").toLowerCase();
+              const slug = String(p.slug || "").toLowerCase();
+              const isDemo =
+                (p.id && String(p.id).startsWith("demo_")) ||
+                name.includes("alex morgan") ||
+                slug.includes("alex-morgan");
+              return !isDemo;
+            })
+            .map((p) => ({
+              ...p,
+              currency: p.currency === "$" || !p.currency ? "₹" : p.currency,
+            }));
         }
       }
     } catch (e) {
