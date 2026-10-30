@@ -61,6 +61,7 @@ import {
   Unlock,
   Key,
   Image as ImageIcon,
+  Copy,
 } from "lucide-react";
 import {
   InstagramIcon,
@@ -119,6 +120,7 @@ export default function AdminDashboard() {
   const [standeeClient, setStandeeClient] = useState<ClientProfile | null>(null);
   const [standeeQrUrl, setStandeeQrUrl] = useState<string>("");
   const [deleteTarget, setDeleteTarget] = useState<ClientProfile | null>(null);
+  const [detailClient, setDetailClient] = useState<ClientProfile | null>(null);
 
   // Toast
   const [toasts, setToasts] = useState<{ id: string; message: string }[]>([]);
@@ -422,10 +424,14 @@ export default function AdminDashboard() {
       updatedAt: new Date().toISOString(),
     };
 
-    const updatedList = clients.map((c) => (c.slug === client.slug ? updated : c));
+    const updatedList = clients.map((c) => (c.slug === client.slug || c.id === client.id ? updated : c));
     setClients(updatedList);
     Storage.saveAll(updatedList);
     saveProfileToSupabase(updated);
+
+    if (detailClient && (detailClient.slug === client.slug || detailClient.id === client.id)) {
+      setDetailClient(updated);
+    }
 
     addToast(
       nextStatus === "active"
@@ -453,12 +459,86 @@ export default function AdminDashboard() {
       updatedAt: new Date().toISOString(),
     };
 
-    const updatedList = clients.map((c) => (c.slug === client.slug ? updated : c));
+    const updatedList = clients.map((c) => (c.slug === client.slug || c.id === client.id ? updated : c));
     setClients(updatedList);
     Storage.saveAll(updatedList);
     saveProfileToSupabase(updated);
 
+    if (detailClient && (detailClient.slug === client.slug || detailClient.id === client.id)) {
+      setDetailClient(updated);
+    }
+
     addToast(`⚡ Renewed ${client.name}: +30 days (expires ${newExpiry})`);
+  }
+
+  // Toggle Individual Link Active / Disabled
+  function handleToggleLinkStatus(client: ClientProfile, linkId: string) {
+    const updatedLinks = (client.links || []).map((l) => {
+      if (l.id === linkId) {
+        const nextState = l.isEnabled === false ? true : false;
+        return { ...l, isEnabled: nextState };
+      }
+      return l;
+    });
+
+    const targetLink = client.links?.find((l) => l.id === linkId);
+    const isNowActive = targetLink?.isEnabled === false;
+
+    const updatedClient: ClientProfile = {
+      ...client,
+      links: updatedLinks,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const updatedList = clients.map((c) =>
+      c.slug === client.slug || c.id === client.id ? updatedClient : c
+    );
+    setClients(updatedList);
+    Storage.upsert(updatedClient);
+
+    if (detailClient && (detailClient.slug === client.slug || detailClient.id === client.id)) {
+      setDetailClient(updatedClient);
+    }
+
+    addToast(
+      `Link "${targetLink?.title || "Link"}" ${isNowActive ? "🟢 enabled" : "⚪ disabled (hidden from QR)"}`
+    );
+  }
+
+  // Render Link Icon Helper
+  function renderLinkIcon(type: LinkType) {
+    switch (type) {
+      case "whatsapp":
+        return <WhatsAppIcon size={18} />;
+      case "instagram":
+        return <InstagramIcon size={18} />;
+      case "facebook":
+        return <FacebookIcon size={18} />;
+      case "youtube":
+        return <YoutubeIcon size={18} />;
+      case "linkedin":
+        return <LinkedinIcon size={18} />;
+      case "tiktok":
+        return <TikTokIcon size={18} />;
+      case "x":
+        return <XIcon size={18} />;
+      case "telegram":
+        return <TelegramIcon size={18} />;
+      case "google_maps":
+        return <GoogleMapsIcon size={18} />;
+      case "phone":
+        return <Phone size={18} />;
+      case "email":
+        return <Mail size={18} />;
+      case "store":
+        return <ShoppingBag size={18} />;
+      case "menu":
+        return <UtensilsCrossed size={18} />;
+      case "website":
+      case "custom":
+      default:
+        return <Globe size={18} />;
+    }
   }
 
   // Open WhatsApp Payment Reminder
@@ -1087,11 +1167,11 @@ export default function AdminDashboard() {
                   <table className="clients-table">
                     <thead>
                       <tr>
-                        <th>Business Profile</th>
+                        <th>Shop / Business</th>
+                        <th>Links</th>
                         <th>Owner & Contact</th>
-                        <th>Subscription Plan</th>
-                        <th>Status & Expiry</th>
-                        <th>Kill-Switch (Active/Unpaid)</th>
+                        <th>Subscription & Expiry</th>
+                        <th>Kill-Switch</th>
                         <th style={{ textAlign: "right" }}>Actions</th>
                       </tr>
                     </thead>
@@ -1099,11 +1179,18 @@ export default function AdminDashboard() {
                       {filteredClients.map((client) => {
                         const sub = getSubscriptionState(client);
                         const isSwitchActive = client.status === "active";
+                        const totalLinks = (client.links || []).length;
+                        const activeLinks = (client.links || []).filter((l) => l.isEnabled !== false).length;
 
                         return (
-                          <tr key={client.slug || client.id}>
+                          <tr key={client.slug || client.id} className="client-table-row">
+                            {/* 1. Shop / Business */}
                             <td>
-                              <div className="client-identity-box">
+                              <div
+                                className="client-identity-box clickable"
+                                onClick={() => setDetailClient(client)}
+                                title="Click to open full client details & links"
+                              >
                                 <div className="client-table-avatar">
                                   {client.avatarUrl ? (
                                     <img
@@ -1119,21 +1206,45 @@ export default function AdminDashboard() {
                                 </div>
                                 <div>
                                   <span className="client-table-name">{client.name}</span>
-                                  <Link
-                                    href={`/p/${client.slug}`}
-                                    target="_blank"
-                                    className="client-table-slug-link"
-                                    title="Open live public QR page"
-                                  >
-                                    /p/{client.slug}
-                                    <ExternalLink size={12} />
-                                  </Link>
+                                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "2px" }}>
+                                    <Link
+                                      href={`/p/${client.slug}`}
+                                      target="_blank"
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="client-table-slug-link"
+                                      title="Open live public QR page"
+                                    >
+                                      /p/{client.slug}
+                                      <ExternalLink size={11} />
+                                    </Link>
+                                  </div>
                                 </div>
                               </div>
                             </td>
 
+                            {/* 2. Total Links Count */}
                             <td>
-                              <div>
+                              <button
+                                type="button"
+                                className="client-links-count-pill"
+                                onClick={() => setDetailClient(client)}
+                                title="Click to inspect and toggle separate links"
+                              >
+                                <Layers size={13} />
+                                <span className="links-count-text">
+                                  <strong>{totalLinks}</strong> {totalLinks === 1 ? "Link" : "Links"}
+                                </span>
+                                {totalLinks > 0 && (
+                                  <span className={`links-status-mini ${activeLinks === totalLinks ? "all-active" : "has-disabled"}`}>
+                                    {activeLinks}/{totalLinks} on
+                                  </span>
+                                )}
+                              </button>
+                            </td>
+
+                            {/* 3. Owner & Contact (Clean spacing, no overlap) */}
+                            <td>
+                              <div className="client-owner-cell">
                                 <span className="client-owner-name">
                                   {client.clientName || "—"}
                                 </span>
@@ -1146,38 +1257,38 @@ export default function AdminDashboard() {
                                       type="button"
                                       className="btn-whatsapp-chat-mini"
                                       title="Send prefilled WhatsApp subscription reminder"
-                                      onClick={() => handleSendWhatsAppReminder(client)}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSendWhatsAppReminder(client);
+                                      }}
                                     >
                                       <MessageCircle size={12} />
-                                      Remind
+                                      <span>Remind</span>
                                     </button>
                                   )}
                                 </div>
                               </div>
                             </td>
 
-                            <td>
-                              <span className="plan-pill">
-                                {client.currency || "$"}
-                                {client.planPrice}
-                              </span>
-                              <span className="plan-cycle-sub">
-                                /{client.billingCycle || "month"}
-                              </span>
-                            </td>
-
+                            {/* 4. Subscription & Expiry */}
                             <td>
                               <div className="status-badge-wrap">
-                                <div className={`status-pill ${sub.badgeClass}`}>
-                                  <span className="status-dot-mini" />
-                                  {sub.label}
+                                <div className="status-plan-row">
+                                  <span className="plan-pill">
+                                    {client.currency || "$"}{client.planPrice}
+                                  </span>
+                                  <div className={`status-pill ${sub.badgeClass}`}>
+                                    <span className="status-dot-mini" />
+                                    {sub.label}
+                                  </div>
                                 </div>
                                 <span className="expiry-date-caption">
-                                  {sub.caption}
+                                  Valid until {client.expiryDate || "Lifetime"}
                                 </span>
                               </div>
                             </td>
 
+                            {/* 5. Kill-Switch */}
                             <td>
                               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                 <label className="switch-toggle" title="Toggle Active / Suspended">
@@ -1200,15 +1311,17 @@ export default function AdminDashboard() {
                               </div>
                             </td>
 
+                            {/* 6. Actions */}
                             <td>
                               <div className="table-actions-group">
                                 <button
                                   type="button"
-                                  className="btn-table-action action-renew"
-                                  title="Renew +30 Days instantly"
-                                  onClick={() => handleQuickRenew(client)}
+                                  className="btn-table-manage"
+                                  title="View Full Client Details & Control Individual Links"
+                                  onClick={() => setDetailClient(client)}
                                 >
-                                  <RotateCw size={15} />
+                                  <Eye size={14} />
+                                  <span>Manage</span>
                                 </button>
 
                                 <button
@@ -1218,15 +1331,6 @@ export default function AdminDashboard() {
                                   onClick={() => setStandeeClient(client)}
                                 >
                                   <Printer size={15} />
-                                </button>
-
-                                <button
-                                  type="button"
-                                  className="btn-table-action"
-                                  title="Edit Shop Profile & Links"
-                                  onClick={() => handleEditClient(client)}
-                                >
-                                  <Edit size={15} />
                                 </button>
 
                                 <button
@@ -1844,7 +1948,7 @@ export default function AdminDashboard() {
                         formModel.links.map((link) => (
                           <div key={link.id} className="link-entry-card">
                             <div className="link-icon-box">
-                              <Globe size={18} />
+                              {renderLinkIcon(link.linkType)}
                             </div>
 
                             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -1910,6 +2014,28 @@ export default function AdminDashboard() {
                                     handleUpdateLink(link.id, { badge: e.target.value })
                                   }
                                 />
+                                <label
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "5px",
+                                    fontSize: "0.75rem",
+                                    color: link.isEnabled !== false ? "#10B981" : "#94A3B8",
+                                    cursor: "pointer",
+                                    fontWeight: 600,
+                                    whiteSpace: "nowrap",
+                                  }}
+                                  title="Toggle this link active or disabled"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={link.isEnabled !== false}
+                                    onChange={(e) =>
+                                      handleUpdateLink(link.id, { isEnabled: e.target.checked })
+                                    }
+                                  />
+                                  {link.isEnabled !== false ? "Active" : "Disabled (Hidden)"}
+                                </label>
                                 <label
                                   style={{
                                     display: "inline-flex",
@@ -2333,6 +2459,312 @@ export default function AdminDashboard() {
           </form>
         )}
       </main>
+
+      {/* MODAL 0: CLIENT FULL DETAILS & INDIVIDUAL LINK CONTROLLER */}
+      {detailClient && (
+        <div className="modal-overlay" onClick={() => setDetailClient(null)}>
+          <div
+            className="modal-box client-detail-modal"
+            style={{ maxWidth: "820px" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="modal-header client-detail-header">
+              <div className="detail-header-left">
+                <div className="detail-avatar-wrap">
+                  {detailClient.avatarUrl ? (
+                    <img src={detailClient.avatarUrl} alt={detailClient.name} />
+                  ) : (
+                    <span style={{ fontWeight: 800, fontSize: "1.4rem", color: "#2563EB" }}>
+                      {(detailClient.name || "B").substring(0, 1).toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <div className="detail-header-text">
+                  <div className="detail-title-row">
+                    <h2 className="detail-shop-name">{detailClient.name}</h2>
+                    <span className="badge-verified-mini">Verified QR Node</span>
+                  </div>
+                  <div className="detail-url-pills">
+                    <a
+                      href={`/p/${detailClient.slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="detail-url-link"
+                    >
+                      {getTargetBaseUrl().replace(/^https?:\/\//, "")}/p/{detailClient.slug}
+                      <ExternalLink size={12} />
+                    </a>
+                    <button
+                      type="button"
+                      className="btn-copy-mini"
+                      onClick={() => {
+                        const url = `${getTargetBaseUrl()}/p/${detailClient.slug}`;
+                        navigator.clipboard.writeText(url);
+                        addToast("📋 Copied live public URL to clipboard!");
+                      }}
+                    >
+                      <Copy size={12} /> Copy URL
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => setDetailClient(null)}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="modal-body-scroll" style={{ padding: "24px" }}>
+              {/* Client Info & Subscription Grid */}
+              <div className="detail-summary-grid">
+                {/* 1. Subscription & Kill Switch */}
+                <div className="detail-card">
+                  <div className="detail-card-title">
+                    <ShieldCheck size={16} />
+                    <span>Subscription & Kill-Switch</span>
+                  </div>
+                  <div className="detail-card-body">
+                    <div className="detail-status-row">
+                      <div className={`status-pill ${getSubscriptionState(detailClient).badgeClass}`}>
+                        <span className="status-dot-mini" />
+                        {getSubscriptionState(detailClient).label}
+                      </div>
+
+                      <div className="killswitch-group">
+                        <label className="switch-toggle" title="Toggle Active / Suspended">
+                          <input
+                            type="checkbox"
+                            checked={detailClient.status === "active"}
+                            onChange={() => handleToggleStatus(detailClient)}
+                          />
+                          <span className="switch-slider" />
+                        </label>
+                        <span
+                          style={{
+                            fontSize: "0.75rem",
+                            fontWeight: 700,
+                            color: detailClient.status === "active" ? "#10B981" : "#EF4444",
+                          }}
+                        >
+                          {detailClient.status === "active" ? "ACTIVE" : "LOCKED"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="detail-meta-text">
+                      Valid until: <strong>{detailClient.expiryDate || "Lifetime"}</strong>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="btn-renew-wide"
+                      onClick={() => handleQuickRenew(detailClient)}
+                    >
+                      <RotateCw size={14} />
+                      Extend Subscription (+30 Days)
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. Owner & Plan */}
+                <div className="detail-card">
+                  <div className="detail-card-title">
+                    <Users size={16} />
+                    <span>Owner & Subscription Plan</span>
+                  </div>
+                  <div className="detail-card-body">
+                    <div className="detail-owner-info">
+                      <div className="detail-field">
+                        <span className="detail-field-label">Owner Name</span>
+                        <span className="detail-field-value">{detailClient.clientName || "—"}</span>
+                      </div>
+                      <div className="detail-field">
+                        <span className="detail-field-label">Billing Rate</span>
+                        <span className="detail-field-value">
+                          {detailClient.currency || "$"}{detailClient.planPrice} / {detailClient.billingCycle || "month"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="detail-phone-row">
+                      <div className="detail-phone-text">
+                        <Phone size={13} />
+                        <span>{detailClient.clientPhone || detailClient.contactPhone || "No phone added"}</span>
+                      </div>
+                      {(detailClient.clientPhone || detailClient.contactPhone) && (
+                        <button
+                          type="button"
+                          className="btn-whatsapp-chat-mini"
+                          onClick={() => handleSendWhatsAppReminder(detailClient)}
+                        >
+                          <MessageCircle size={13} />
+                          WhatsApp Remind
+                        </button>
+                      )}
+                    </div>
+
+                    {detailClient.address && (
+                      <div className="detail-address-text">
+                        <MapPin size={13} />
+                        <span>{detailClient.address}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Individual Links Management Section */}
+              <div className="detail-links-box">
+                <div className="detail-links-header-row">
+                  <div>
+                    <h3 className="detail-links-heading">
+                      Client Links & Access Control
+                      <span className="detail-links-count-pill">
+                        {detailClient.links?.length || 0} Total &bull;{" "}
+                        <strong style={{ color: "#10B981" }}>
+                          {(detailClient.links || []).filter((l) => l.isEnabled !== false).length} Active
+                        </strong>
+                        {(detailClient.links || []).some((l) => l.isEnabled === false) && (
+                          <span style={{ color: "#EF4444", marginLeft: "4px" }}>
+                            &bull; {(detailClient.links || []).filter((l) => l.isEnabled === false).length} Off
+                          </span>
+                        )}
+                      </span>
+                    </h3>
+                    <p className="detail-links-sub">
+                      Turn individual links ON or OFF anytime. Disabled links are immediately hidden from customer QR scans without deleting them.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => {
+                      handleEditClient(detailClient);
+                      setDetailClient(null);
+                    }}
+                  >
+                    <Edit size={14} /> Edit All in Studio
+                  </button>
+                </div>
+
+                {(!detailClient.links || detailClient.links.length === 0) ? (
+                  <div className="empty-links-state">
+                    <p>No links found for this client.</p>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={() => {
+                        handleEditClient(detailClient);
+                        setDetailClient(null);
+                      }}
+                    >
+                      <Plus size={14} /> Add Links in Studio
+                    </button>
+                  </div>
+                ) : (
+                  <div className="detail-links-items">
+                    {detailClient.links.map((link, idx) => {
+                      const isLinkActive = link.isEnabled !== false;
+                      return (
+                        <div
+                          key={link.id || idx}
+                          className={`detail-link-card ${isLinkActive ? "link-active" : "link-disabled"}`}
+                        >
+                          <div className="detail-link-card-left">
+                            <div className="detail-link-icon-circle">
+                              {renderLinkIcon(link.linkType)}
+                            </div>
+                            <div className="detail-link-main">
+                              <div className="detail-link-meta-row">
+                                <span className="detail-link-title-text">{link.title || "Untitled Link"}</span>
+                                <span className="detail-link-type-tag">{link.linkType}</span>
+                                {link.badge && (
+                                  <span className="detail-link-highlight-tag">{link.badge}</span>
+                                )}
+                                {!isLinkActive && (
+                                  <span className="detail-link-hidden-tag">Hidden from QR</span>
+                                )}
+                              </div>
+                              <div className="detail-link-dest-url" title={link.destination}>
+                                {link.destination}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="detail-link-card-right">
+                            <div className="link-toggle-switch-group">
+                              <label
+                                className="switch-toggle"
+                                title={isLinkActive ? "Click to Disable this link" : "Click to Enable this link"}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isLinkActive}
+                                  onChange={() => handleToggleLinkStatus(detailClient, link.id)}
+                                />
+                                <span className="switch-slider" />
+                              </label>
+                              <span
+                                className="link-switch-status-label"
+                                style={{
+                                  color: isLinkActive ? "#10B981" : "#94A3B8",
+                                  fontWeight: 700,
+                                  fontSize: "0.75rem",
+                                }}
+                              >
+                                {isLinkActive ? "ACTIVE" : "DISABLED"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="modal-footer" style={{ justifyContent: "space-between" }}>
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setStandeeClient(detailClient);
+                    setDetailClient(null);
+                  }}
+                >
+                  <Printer size={16} /> Print Standee
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    handleEditClient(detailClient);
+                    setDetailClient(null);
+                  }}
+                >
+                  <Edit size={16} /> Edit Profile
+                </button>
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setDetailClient(null)}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL 1: ACRYLIC COUNTER STANDEE GENERATOR */}
       {standeeClient && (
